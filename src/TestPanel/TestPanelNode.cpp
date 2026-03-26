@@ -18,6 +18,8 @@
 
 #include <array>
 #include <atomic>
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
@@ -50,6 +52,16 @@
 #include "ros2_isobus/msg/tecu_rear_hitch_status.hpp"
 #include "ros2_isobus/msg/tecu_rear_pto_status.hpp"
 #include "ros2_isobus/msg/tecu_steering_wheel.hpp"
+#include "ros2_isobus/msg/tim_curvature_command.hpp"
+#include "ros2_isobus/msg/tim_cruise_command.hpp"
+#include "ros2_isobus/msg/tim_rear_hitch_command.hpp"
+#include "ros2_isobus/msg/tim_rear_pto_command.hpp"
+#include "ros2_isobus/msg/tim_aux_valve_command.hpp"
+#include "ros2_isobus/msg/tim_curvature_status.hpp"
+#include "ros2_isobus/msg/tim_cruise_status.hpp"
+#include "ros2_isobus/msg/tim_rear_hitch_status.hpp"
+#include "ros2_isobus/msg/tim_rear_pto_status.hpp"
+#include "ros2_isobus/msg/tim_aux_valve_status.hpp"
 #include "ros2_isobus/msg/isobus_address_status.hpp"
 #include "ros2_isobus/msg/isobus_address_book.hpp"
 
@@ -66,7 +78,6 @@ constexpr double kCruiseStep = 0.2;        // Speed step (m/s) per key press.
 constexpr double kCurvatureStep = 0.005;   // Curvature step (1/m) per key press.
 constexpr double kHitchStep = 2.0;         // Hitch adjustment percent per key press.
 constexpr double kValveStep = 5.0;         // Valve adjustment percent per key press.
-constexpr double kCruiseStopTimeout = 1.0; // Seconds after speed==0 before cruise stops.
 }  // namespace
 
 class TerminalMode
@@ -97,11 +108,19 @@ public:
     declare_parameter<double>("initial_cruise_speed", 0.0);
     declare_parameter<double>("initial_hitch", 0.0);
     declare_parameter<bool>("initial_pto_engaged", false);
+    declare_parameter<std::string>("control_interface", "tecu");
 
     state_.curvature = get_parameter("initial_curvature").as_double();
     state_.cruise_speed = get_parameter("initial_cruise_speed").as_double();
     state_.hitch = get_parameter("initial_hitch").as_double();
     state_.pto_engaged = get_parameter("initial_pto_engaged").as_bool();
+    {
+      auto mode = get_parameter("control_interface").as_string();
+      std::transform(mode.begin(), mode.end(), mode.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      use_tim_interface_ = (mode == "tim");
+    }
+    terminal_ui_enabled_ = (isatty(STDIN_FILENO) == 1) && (isatty(STDOUT_FILENO) == 1);
 
     // Publishers
     guidance_pub_ = create_publisher<msg::TecuGuidanceCommand>(kTECUCurvatureCommandTopic, 10);
@@ -109,11 +128,17 @@ public:
     hitch_pub_ = create_publisher<msg::TecuRearHitchCommand>(kTECURearHitchCommandTopic, 10);
     pto_pub_ = create_publisher<msg::TecuRearPtoCommand>(kTECURearPtoCommandTopic, 10);
     valve_pub_ = create_publisher<msg::AuxValveCommand>(kAuxValveCommandTopic, 10);
+    tim_guidance_pub_ = create_publisher<msg::TimCurvatureCommand>(kTIMCurvatureCommandTopic, 10);
+    tim_cruise_pub_ = create_publisher<msg::TimCruiseCommand>(kTIMCruiseCommandTopic, 10);
+    tim_hitch_pub_ = create_publisher<msg::TimRearHitchCommand>(kTIMRearHitchCommandTopic, 10);
+    tim_pto_pub_ = create_publisher<msg::TimRearPtoCommand>(kTIMRearPtoCommandTopic, 10);
+    tim_valve_pub_ = create_publisher<msg::TimAuxValveCommand>(kTIMAuxValveCommandTopic, 10);
 
     // Subscriptions (telemetry cached for rendering)
     guidance_sub_ = create_subscription<msg::TecuGuidanceStatus>(
       kTECUGuidanceStatusTopic, 10,
       [this](const msg::TecuGuidanceStatus::SharedPtr m) {
+        if (use_tim_interface_) return;
         if (!m) return;
         std::lock_guard<std::mutex> lk(mutex_);
         telem_.measured_curvature = m->measured_curvature;
@@ -123,6 +148,7 @@ public:
     cruise_sub_ = create_subscription<msg::TecuCruiseStatus>(
       kTECUCruiseStatusTopic, 10,
       [this](const msg::TecuCruiseStatus::SharedPtr m) {
+        if (use_tim_interface_) return;
         if (!m) return;
         std::lock_guard<std::mutex> lk(mutex_);
         telem_.cruise_speed = m->command_speed;
@@ -141,6 +167,7 @@ public:
     valve_status_sub_ = create_subscription<msg::AuxValveStatus>(
       kAuxValveStatusTopic, 10,
       [this](const msg::AuxValveStatus::SharedPtr m) {
+        if (use_tim_interface_) return;
         if (!m) return;
         if (m->valve_number < 1 || m->valve_number > state_.valve_flow.size()) return;
         std::lock_guard<std::mutex> lk(mutex_);
@@ -170,6 +197,7 @@ public:
     hitch_status_sub_ = create_subscription<msg::TecuRearHitchStatus>(
       kTECURearHitchTopic, 10,
       [this](const msg::TecuRearHitchStatus::SharedPtr m) {
+        if (use_tim_interface_) return;
         if (!m) return;
         std::lock_guard<std::mutex> lk(mutex_);
         telem_.hitch = m->position_percent;
@@ -178,10 +206,70 @@ public:
     pto_status_sub_ = create_subscription<msg::TecuRearPtoStatus>(
       kTECURearPtoTopic, 10,
       [this](const msg::TecuRearPtoStatus::SharedPtr m) {
+        if (use_tim_interface_) return;
         if (!m) return;
         std::lock_guard<std::mutex> lk(mutex_);
         telem_.pto_rpm = m->rpm;
         telem_.pto_engaged = (m->engagement == 0x01);
+      });
+
+    tim_guidance_sub_ = create_subscription<msg::TimCurvatureStatus>(
+      kTIMCurvatureStatusTopic, 10,
+      [this](const msg::TimCurvatureStatus::SharedPtr m) {
+        if (!use_tim_interface_) return;
+        if (!m) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        telem_.measured_curvature = m->measured_curvature_km_inv / 1000.0;
+        telem_.command_device = m->active ? 1 : 0;
+      });
+
+    tim_cruise_sub_ = create_subscription<msg::TimCruiseStatus>(
+      kTIMCruiseStatusTopic, 10,
+      [this](const msg::TimCruiseStatus::SharedPtr m) {
+        if (!use_tim_interface_) return;
+        if (!m) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        telem_.cruise_speed = m->measured_speed;
+        telem_.cruise_status = m->automation_status;
+      });
+
+    tim_hitch_status_sub_ = create_subscription<msg::TimRearHitchStatus>(
+      kTIMRearHitchStatusTopic, 10,
+      [this](const msg::TimRearHitchStatus::SharedPtr m) {
+        if (!use_tim_interface_) return;
+        if (!m) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        telem_.hitch = m->position_percent;
+      });
+
+    tim_pto_status_sub_ = create_subscription<msg::TimRearPtoStatus>(
+      kTIMRearPtoStatusTopic, 10,
+      [this](const msg::TimRearPtoStatus::SharedPtr m) {
+        if (!use_tim_interface_) return;
+        if (!m) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        telem_.pto_rpm = m->rpm;
+        telem_.pto_engaged = m->active;
+      });
+
+    tim_valve_status_sub_ = create_subscription<msg::TimAuxValveStatus>(
+      kTIMAuxValveStatusTopic, 10,
+      [this](const msg::TimAuxValveStatus::SharedPtr m) {
+        if (!use_tim_interface_) return;
+        if (!m) return;
+        if (m->valve_number < 1 || m->valve_number > state_.valve_flow.size()) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        const auto idx = m->valve_number - 1;
+        // TIM AUX flow is signed: positive extend, negative retract.
+        if (m->flow_percent >= 0.0f) {
+          telem_.valve_extend[idx] = m->flow_percent;
+          telem_.valve_retract[idx] = 0.0;
+        } else {
+          telem_.valve_extend[idx] = 0.0;
+          telem_.valve_retract[idx] = -m->flow_percent;
+        }
+        telem_.valve_state[idx] = m->automation_status;
+        telem_.valve_failsafe[idx] = m->fault;
       });
 
     steering_wheel_sub_ = create_subscription<msg::TecuSteeringWheel>(
@@ -241,14 +329,21 @@ public:
     publish_timer_ = create_wall_timer(
       std::chrono::milliseconds(100),
       [this]() { publishLoop(); });
-    render_timer_ = create_wall_timer(
-      std::chrono::milliseconds(200),
-      [this]() { render(); });
-
-    // Keyboard thread
-    key_thread_ = std::thread([this]() { keyLoop(); });
-
-    RCLCPP_INFO(get_logger(), "Test panel running. Use keyboard to send commands.");
+    if (terminal_ui_enabled_)
+    {
+      render_timer_ = create_wall_timer(
+        std::chrono::milliseconds(200),
+        [this]() { render(); });
+      // Keyboard thread
+      key_thread_ = std::thread([this]() { keyLoop(); });
+      RCLCPP_INFO(get_logger(), "Test panel running. Use keyboard to send commands.");
+    }
+    else
+    {
+      RCLCPP_WARN(
+        get_logger(),
+        "TestPanel started without interactive TTY (e.g. via ros2 launch): terminal UI disabled.");
+    }
   }
 
   ~TestPanelNode() override
@@ -312,58 +407,94 @@ private:
   void publishLoop()
   {
     std::lock_guard<std::mutex> lk(mutex_);
-    const auto now = this->now();
 
-    if (state_.curvature_active && guidance_pub_)
+    if (state_.curvature_active && (use_tim_interface_ ? static_cast<bool>(tim_guidance_pub_) : static_cast<bool>(guidance_pub_)))
     {
-      msg::TecuGuidanceCommand msg;
-      msg.curvature = state_.curvature;
-      guidance_pub_->publish(msg);
-    }
-
-    if (cruise_pub_)
-    {
-      bool recently_input = (state_.last_cruise_input.nanoseconds() != 0) &&
-                            (now - state_.last_cruise_input) <
-                              rclcpp::Duration::from_seconds(kCruiseStopTimeout);
-      if (state_.cruise_active && recently_input && std::abs(state_.cruise_speed) > 1e-4)
-      {
-        msg::TecuCruiseCommand msg;
-        msg.speed = state_.cruise_speed;
-        msg.max_speed = std::abs(state_.cruise_speed);
-        cruise_pub_->publish(msg);
+      if (use_tim_interface_) {
+        msg::TimCurvatureCommand msg;
+        msg.curvature_km_inv = state_.curvature * 1000.0;
+        msg.enable = state_.curvature_active;
+        if (tim_guidance_pub_) tim_guidance_pub_->publish(msg);
+      } else {
+        msg::TecuGuidanceCommand msg;
+        msg.curvature = state_.curvature;
+        guidance_pub_->publish(msg);
       }
     }
 
-    if (state_.hitch_dirty && hitch_pub_)
+    if (use_tim_interface_ ? static_cast<bool>(tim_cruise_pub_) : static_cast<bool>(cruise_pub_))
     {
-      msg::TecuRearHitchCommand msg;
-      msg.position_percent = state_.hitch;
-      hitch_pub_->publish(msg);
-      state_.hitch_dirty = false;
-    }
-
-    if (state_.pto_dirty && pto_pub_)
-    {
-      msg::TecuRearPtoCommand msg;
-      msg.rpm = state_.pto_engaged ? 540.0 : 0.0;
-      msg.engagement = state_.pto_engaged;
-      pto_pub_->publish(msg);
-      state_.pto_dirty = false;
-    }
-
-    if (valve_pub_)
-    {
-      for (std::size_t i = 0; i < state_.valve_flow.size(); ++i)
+      if (state_.cruise_active && std::abs(state_.cruise_speed) > 1e-4)
       {
-        if (state_.valve_enable[i] /*&& state_.valve_dirty[i]*/)
+        if (use_tim_interface_) {
+          msg::TimCruiseCommand msg;
+          msg.speed = state_.cruise_speed;
+          msg.enable = state_.cruise_active;
+          if (tim_cruise_pub_) tim_cruise_pub_->publish(msg);
+        } else {
+          msg::TecuCruiseCommand msg;
+          msg.speed = state_.cruise_speed;
+          msg.max_speed = std::abs(state_.cruise_speed);
+          cruise_pub_->publish(msg);
+        }
+      }
+    }
+
+    const bool send_hitch = use_tim_interface_ ? true : state_.hitch_dirty;
+    if (send_hitch && (use_tim_interface_ ? static_cast<bool>(tim_hitch_pub_) : static_cast<bool>(hitch_pub_)))
+    {
+      if (use_tim_interface_) {
+        msg::TimRearHitchCommand msg;
+        msg.position_percent = state_.hitch;
+        msg.enable = true;
+        if (tim_hitch_pub_) tim_hitch_pub_->publish(msg);
+      } else {
+        msg::TecuRearHitchCommand msg;
+        msg.position_percent = state_.hitch;
+        hitch_pub_->publish(msg);
+      }
+      if (!use_tim_interface_) state_.hitch_dirty = false;
+    }
+
+    const bool send_pto = use_tim_interface_ ? true : state_.pto_dirty;
+    if (send_pto && (use_tim_interface_ ? static_cast<bool>(tim_pto_pub_) : static_cast<bool>(pto_pub_)))
+    {
+      if (use_tim_interface_) {
+        msg::TimRearPtoCommand msg;
+        msg.rpm = state_.pto_engaged ? 540.0 : 0.0;
+        // In TIM test mode keep function enabled; Space toggles requested speed only.
+        msg.engagement = true;
+        if (tim_pto_pub_) tim_pto_pub_->publish(msg);
+      } else {
+        msg::TecuRearPtoCommand msg;
+        msg.rpm = state_.pto_engaged ? 540.0 : 0.0;
+        msg.engagement = state_.pto_engaged;
+        pto_pub_->publish(msg);
+      }
+      if (!use_tim_interface_) state_.pto_dirty = false;
+    }
+
+    if (!state_.valve_enable.empty())
+    {
+      for (std::size_t i = 0; i < state_.valve_enable.size(); ++i)
+      {
+        // Publish while enabled, and also publish one-shot updates when disabling/changing.
+        if (state_.valve_enable[i] || state_.valve_dirty[i])
         {
-          msg::AuxValveCommand msg;
-          msg.valve_number = static_cast<std::uint8_t>(i + 1);
-          msg.flow_percent = static_cast<float>(state_.valve_flow[i]);
-          msg.floating = false;  // Could add key toggle later.
-          msg.failsafe = false;
-          valve_pub_->publish(msg);
+          if (use_tim_interface_) {
+            msg::TimAuxValveCommand msg;
+            msg.valve_number = static_cast<std::uint8_t>(i + 1);
+            msg.flow_percent = static_cast<float>(std::clamp(state_.valve_flow[i], -100.0, 100.0));
+            msg.enable = state_.valve_enable[i];
+            if (tim_valve_pub_) tim_valve_pub_->publish(msg);
+          } else if (valve_pub_) {
+            msg::AuxValveCommand msg;
+            msg.valve_number = static_cast<std::uint8_t>(i + 1);
+            msg.flow_percent = static_cast<float>(state_.valve_flow[i]);
+            msg.floating = false;  // Could add key toggle later.
+            msg.failsafe = false;
+            valve_pub_->publish(msg);
+          }
           state_.valve_dirty[i] = false;
         }
       }
@@ -382,6 +513,7 @@ private:
 
     printf("\033[2J\033[H");  // Clear and home the terminal.
     printf("ROS2ISOBUS Test Panel\n");
+    printf("Control interface: %s\n", use_tim_interface_ ? "TIM" : "TECUClass3");
     printf("---- AddressManager ---------------------------------------\n");
     printf("SA: %3u  Addr book entries: %zu\n", tcopy.my_sa, tcopy.addr_book_entries);
     if (!tcopy.addr_entries.empty())
@@ -403,21 +535,23 @@ private:
     printf("----  TECU Client -------------------------------------------------\n");
     printf("Curvature meas: %8.4f  device:%u        Curvature cmd: %8.4f %s\n",
            tcopy.measured_curvature, tcopy.command_device,
-           scopy.curvature, scopy.curvature_active ? "[ACTIVE]" : "[idle]");
+           scopy.curvature,
+           (scopy.curvature_active ? "[ACTIVE]" : "[idle]"));
     printf("Cruise speed:  %8.3f  status:%d         Cruise cmd:       %8.3f %s\n",
            tcopy.cruise_speed, tcopy.cruise_status,
-           scopy.cruise_speed, scopy.cruise_active ? "[ACTIVE]" : "[idle]");
+           scopy.cruise_speed,
+           (scopy.cruise_active ? "[ACTIVE]" : "[idle]"));
     printf("Wheel speed:   %8.3f\n", tcopy.wheel_speed);
     printf("Ground speed:  %8.3f\n", tcopy.ground_speed);
     printf("Hitch meas:    %8.1f%%                   Hitch cmd: %6.1f%% (PgUp/PgDn)\n",
            tcopy.hitch, scopy.hitch);
     printf("PTO meas:      %8.1f rpm [%s]            PTO: %s (Space)\n",
            tcopy.pto_rpm, tcopy.pto_engaged ? "engaged" : "off",
-           scopy.pto_engaged ? "ON " : "OFF");
+           (scopy.pto_engaged ? "ON " : "OFF"));
     printf("Steer angle:   %8.3f rad  mode:%u device:%u\n",
            tcopy.steering_angle, tcopy.steer_mode, tcopy.steer_device);
-    printf("\nValve status (meas / cmd):\n");
-    for (std::size_t i = 0; i < tcopy.valve_extend.size(); ++i)
+    printf("\nValve status (meas / cmd), enabled count: %zu\n", state_.valve_enable.size());
+    for (std::size_t i = 0; i < state_.valve_enable.size(); ++i)
     {
       printf("V%02zu ext:%6.1f ret:%6.1f state:0x%02X fs:%d   cmd:%6.1f %s\n",
              i + 1,
@@ -476,18 +610,18 @@ private:
       if (c >= '1' && c <= '9')
       {
         int idx = (c - '1');
-        toggleValve(idx);
+        if (idx < static_cast<int>(state_.valve_enable.size())) toggleValve(idx);
       }
 
       for (std::size_t i = 0; i < valve_up.size(); ++i)
       {
         if (c == valve_up[i])
         {
-          adjustValve(i, kValveStep);
+          if (i < state_.valve_enable.size()) adjustValve(i, kValveStep);
         }
         else if (c == valve_down[i])
         {
-          adjustValve(i, -kValveStep);
+          if (i < state_.valve_enable.size()) adjustValve(i, -kValveStep);
         }
       }
     }
@@ -534,7 +668,7 @@ private:
 
   void adjustValve(std::size_t idx, double delta)
   {
-    if (idx >= state_.valve_flow.size()) return;
+    if (idx >= state_.valve_enable.size()) return;
     std::lock_guard<std::mutex> lk(mutex_);
     state_.valve_flow[idx] = std::clamp(state_.valve_flow[idx] + delta, -125.0, 125.0);
     state_.valve_dirty[idx] = true;
@@ -556,6 +690,11 @@ private:
   rclcpp::Publisher<msg::TecuRearHitchCommand>::SharedPtr hitch_pub_;
   rclcpp::Publisher<msg::TecuRearPtoCommand>::SharedPtr pto_pub_;
   rclcpp::Publisher<msg::AuxValveCommand>::SharedPtr valve_pub_;
+  rclcpp::Publisher<msg::TimCurvatureCommand>::SharedPtr tim_guidance_pub_;
+  rclcpp::Publisher<msg::TimCruiseCommand>::SharedPtr tim_cruise_pub_;
+  rclcpp::Publisher<msg::TimRearHitchCommand>::SharedPtr tim_hitch_pub_;
+  rclcpp::Publisher<msg::TimRearPtoCommand>::SharedPtr tim_pto_pub_;
+  rclcpp::Publisher<msg::TimAuxValveCommand>::SharedPtr tim_valve_pub_;
 
   rclcpp::Subscription<msg::TecuGuidanceStatus>::SharedPtr guidance_sub_;
   rclcpp::Subscription<msg::TecuCruiseStatus>::SharedPtr cruise_sub_;
@@ -566,6 +705,11 @@ private:
   rclcpp::Subscription<msg::TecuRearHitchStatus>::SharedPtr hitch_status_sub_;
   rclcpp::Subscription<msg::TecuRearPtoStatus>::SharedPtr pto_status_sub_;
   rclcpp::Subscription<msg::TecuSteeringWheel>::SharedPtr steering_wheel_sub_;
+  rclcpp::Subscription<msg::TimCurvatureStatus>::SharedPtr tim_guidance_sub_;
+  rclcpp::Subscription<msg::TimCruiseStatus>::SharedPtr tim_cruise_sub_;
+  rclcpp::Subscription<msg::TimRearHitchStatus>::SharedPtr tim_hitch_status_sub_;
+  rclcpp::Subscription<msg::TimRearPtoStatus>::SharedPtr tim_pto_status_sub_;
+  rclcpp::Subscription<msg::TimAuxValveStatus>::SharedPtr tim_valve_status_sub_;
   rclcpp::Subscription<msg::IsobusAddressStatus>::SharedPtr addr_status_sub_;
   rclcpp::Subscription<msg::IsobusAddressBook>::SharedPtr addr_book_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gnss_sub_;
@@ -578,6 +722,8 @@ private:
   std::thread key_thread_;
   std::atomic<bool> running_{true};
   std::mutex mutex_;
+  bool use_tim_interface_{false};
+  bool terminal_ui_enabled_{true};
   Telemetry telem_;
   CommandState state_;
 };

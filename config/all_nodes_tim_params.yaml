@@ -1,0 +1,113 @@
+can_bridge_node:
+  ros__parameters:
+    interface: can0
+    disable_loopback: true
+    enable_tp: true
+    enable_etp: true
+    tp_strict_cts_timing: false
+    tp_rx_timeout_ms: 1000
+    tp_tx_timeout_ms: 1000
+    tp_tx_window_size_default: 8
+    tp_local_sa: 255
+
+address_manager_node:
+  ros__parameters:
+    ecu_name_hex: "01006007008203A0"
+    preferred_address: 28
+
+diagnostics_node:
+  ros__parameters:
+    source_address: 254
+    priority: 6
+    respond_to_requests: true
+    nack_unsupported_request: true
+    use_address_manager_sa: true
+
+    periodic_dm1_enabled: true
+    dm1_period_ms: 1000
+    dm3_clear_dm2: true
+    dm1_byte1: 255
+    dm1_byte2: 255
+    dm2_byte1: 255
+    dm2_byte2: 255
+
+    # B.1 ECU identification (PGN 0xFDC5), '*' delimited fields.
+    ecu_part_number: "ECU-PN-UNSET"
+    ecu_serial_number: "ECU-SN-UNSET"
+    ecu_location: "UNSET"
+    ecu_type: "UNSET"
+    ecu_manufacturer_name: "UNSET"
+    ecu_hardware_id: "UNSET"
+
+    # B.2 Software identification (PGN 0xFEDA): byte1=count, fields separated by '*'.
+    software_ident_fields: ["ROS2ISOBUS#Diagnostics#1.0"]
+
+    # B.5 Diagnostic protocol identification (PGN 0xFD32), byte1.
+    diagnostic_protocol_id: 0
+
+    # B.6/B.7 DTC arrays.
+    
+    # B.3 ISOBUS certification (PGN 0xFD42), dynamic payload fields.
+    compliance_test_lab_id: 507          
+    compliance_cert_year: 2017           
+    compliance_cert_revision: 1          
+    compliance_lab_type: 1               
+    compliance_reference_number: 4660    
+    compliance_message_revision: 1
+    compliance_type_byte4: 0
+    compliance_type_byte5: 0
+
+    # B.9 Control function functionalities (PGN 0xFC8E).
+    cf_functionality_ids: [0]
+    cf_functionality_generations: [1]
+    cf_functionality_options: [""]
+
+    # B.10 Product identification (PGN 0xFEEB), '*' delimited fields.
+    product_ident_code: "UNSET-CODE"
+    product_ident_brand: "UNSET-BRAND"
+    product_ident_model: "UNSET-MODEL"
+
+nmea2000_node:
+  ros__parameters:
+    frame_id: map
+
+tecu_class2_node:
+  ros__parameters: {}
+
+tim_client_node:
+  ros__parameters:
+    # Authentication mode: None | Dummy | AuthLib
+    auth_mode: AuthLib
+    authlib.strict: false
+    authlib.max_slice_iterations: 50000
+    # Client certificate payload max bytes in TP response (0 = full DER, 26 = testbench interop).
+    authlib.client_cert_payload_max_len: 0
+
+    # AuthLib certificate/key configuration.
+    # CHANGE THESE for your own deployment/certificates.
+    # Paths can be absolute or package-share relative at runtime.
+    authlib.root_cert_path: "third_party/AuthLib/cert/root_ca.der"
+    authlib.client_testlab_cert_path: "third_party/AuthLib/cert/aef_testlab.der"
+    authlib.client_manufacturer_cert_path: "third_party/AuthLib/cert/manu1.der"
+    authlib.client_series_cert_path: "third_party/AuthLib/cert/manu1_series.der"
+    authlib.client_device_cert_path: "third_party/AuthLib/cert/manu1_peer1.der"
+    authlib.client_private_key_hex: "third_party/AuthLib/cert/manu1_peer1.key.hex"
+    # Optional override; keep empty to auto-extract from server device certificate.
+    authlib.server_public_key_hex: ""
+
+    process_period_ms: 50
+    command_mode: direct
+    # Function request timeout: if no new setpoint for this duration, function enable=false.
+    command_timeout_ms: 250
+    implemented_version: 1
+    minimum_version: 1
+    tim.enable_speed: true
+    tim.enable_curvature: false
+    tim.enable_rear_pto: false
+    tim.enable_rear_hitch: false
+    tim.aux_fn_ids: [1, 2]
+    tim.aux_ctrl_modes: [1, 1]
+    tim.speed_ctrl_mode: 1
+    dummy_auth.period_ms: 1000
+    dummy_auth.implemented_version: 3
+    dummy_auth.minimum_version: 2

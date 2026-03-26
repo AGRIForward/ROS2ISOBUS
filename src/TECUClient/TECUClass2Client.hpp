@@ -21,10 +21,11 @@
 #ifndef ROS2_ISOBUS_TECU_CLASS2CLIENT_HPP
 #define ROS2_ISOBUS_TECU_CLASS2CLIENT_HPP
 
+#include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 
-#include "ros2_isobus/ISOBUSframe.hpp"
 #include "ros2_isobus/msg/isobus_frame.hpp"
 #include "ros2_isobus/msg/tecu_ground_speed.hpp"
 #include "ros2_isobus/msg/tecu_rear_hitch_status.hpp"
@@ -36,6 +37,8 @@
 
 namespace ros2_isobus
 {
+
+using ByteArray8 = std::array<std::uint8_t, 8>;
 
 /*
  *

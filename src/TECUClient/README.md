@@ -18,8 +18,8 @@ Standards / PGNs (coverage)
 Limitations  
 - Assumes only one TECU is present on the bus; incoming frames are not filtered by source address, so multiple TECUs would collide/overwrite in parsing.
 
-Topics
-- Subscribes (both classes): `ISOBUS/bus_frames` (`IsobusFrame`).
+Topics  
+- Subscribes (both classes): `ISOBUS/bus_rx_frames` (`IsobusFrame`).  
 - Publishes (Class2):
   - `ISOBUS/tecu/wheel_speed` (`TecuWheelSpeed`)
   - `ISOBUS/tecu/ground_speed` (`TecuGroundSpeed`)

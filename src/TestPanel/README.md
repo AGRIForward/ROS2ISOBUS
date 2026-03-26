@@ -1,32 +1,40 @@
 TestPanel Node
 ==============
 
-Purpose  
-- Interactive keyboard UI for monitoring ISOBUS/TECU telemetry and issuing one-shot or periodic commands (Class3 legacy).  
+Purpose
+- Interactive keyboard UI for monitoring ISOBUS telemetry and sending control commands.
+- Command interface is selectable:
+  - `tecu` (legacy TECU Class3 command topics/messages),
+  - `tim` (TIM command topics/messages).
 
-Monitored topics  
-- TECU telemetry: wheel/ground speed, hitch, PTO, curvature/cruise status, steering valve status, AUX valve status.  
-- AddressManager: SA and address book entries.  
+Control interface selection
+- Parameter: `control_interface`
+  - `tecu` (default)
+  - `tim`
+
+In `tim` mode the panel publishes `Tim*Command` messages and subscribes `Tim*Status`.
+In `tecu` mode the panel publishes `Tecu*Command`/`AuxValveCommand` and subscribes TECU status topics.
+
+Default behavior
+- All command functions are enabled in panel logic.
+- AUX command channels are fixed to 9 (keys 1..9 and Q/A..O/L mappings).
+
+Monitored data
+- AddressManager: own SA and address-book entries.
 - NMEA2000: GNSS position, COG/SOG, attitude.
+- Control status topics based on selected interface (`tecu` or `tim`).
 
-Messages (custom/used)
-- `IsobusAddressStatus`, `IsobusAddressBook`: address manager SA and book snapshot.
-- `TecuWheelSpeed`, `TecuGroundSpeed`, `TecuRearHitchStatus`, `TecuRearPtoStatus`, `TecuGuidanceStatus`, `TecuCruiseStatus`, `AuxValveStatus`: monitored TECU telemetry.
-- `TecuGuidanceCommand`, `TecuCruiseCommand`, `TecuRearHitchCommand`, `TecuRearPtoCommand`, `AuxValveCommand`: commands the panel can publish.
-- `geometry_msgs/TwistStamped`: twist commands.
+Keyboard controls
+- Arrow Up/Down: cruise speed command.
+- Arrow Left/Right: curvature command.
+- Space: PTO toggle.
+- PageUp/PageDown: rear hitch.
+- AUX valves:
+  - adjust flow with Q/A, W/S, E/D, R/F, T/G, Y/H, U/J, I/K, O/L
+  - toggle valve command enable with keys 1..9
 
-Commands (services/keys)  
-- Cruise speed: Up/Down arrows adjust; periodic sends until timeout or stop.  
-- Curvature: Left/Right arrows adjust; continuous send.  
-- PTO ON/OFF toggle: Space.  
-- Hitch up/down: PageUp/PageDown.  
-- AUX valves 1–9: Q/A, W/S, E/D, R/F, T/G, Y/H, U/J, I/K, O/L; enable per valve with number keys 1–9.  
-
-Parameters (examples)  
-- `guidance_curvature`, `cruise_speed`, `cruise_max_speed`, `rear_hitch_position`, `rear_pto_rpm`, `rear_pto_engage`, `valve_number`, `valve_flow_percent`, `valve_state`, `valve_failsafe` (set before triggering services).  
-
-Run  
+Run
 ```bash
 ros2 run ros2_isobus test_panel_node
-# adjust params via ros2 param set ..., call services or use keyboard
+ros2 run ros2_isobus test_panel_node --ros-args -p control_interface:=tim
 ```

@@ -20,15 +20,20 @@
 
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <map>
-#include <limits>
 #include <string>
 
-#include "ros2_isobus/ISOBUSframe.hpp"
 #include "ros2_isobus/msg/isobus_frame.hpp"
 
 namespace ros2_isobus
 {
+
+using ByteArray8 = std::array<std::uint8_t, 8>;
+
+ByteArray8 hex_to_byte_array(const std::string & hex);
+std::string to_hex(std::uint32_t value);
 
 /*
  *
@@ -55,8 +60,8 @@ public:
   AddressManager(const ByteArray8 & name = ByteArray8{}, std::uint8_t preferred_address = 0);
   virtual ~AddressManager() = default;
 
-  std::uint8_t getMySA() const;                      // Return our claimed SA (0 if not claimed).
-  std::uint8_t getSA(const ByteArray8 & name) const; // Look up SA by NAME from the address book.
+  std::uint8_t getMySA() const;                      // Return our claimed SA (0xFE if not claimed).
+  std::uint8_t getSA(const ByteArray8 & name) const; // Look up SA by NAME from the address book (0xFE if unknown).
   const std::map<ByteArray8, std::uint8_t> & address_book() const { return addressbook_; }
 
   NameState state() const { return state_; }

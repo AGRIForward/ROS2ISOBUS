@@ -1,0 +1,15 @@
+# Keep AuthLib folder structure in VCS, but not proprietary contents.
+third_party/AuthLib/*
+!third_party/AuthLib/.gitkeep
+!third_party/AuthLib/include/
+!third_party/AuthLib/lib/
+!third_party/AuthLib/cert/
+third_party/AuthLib/include/*
+third_party/AuthLib/lib/*
+third_party/AuthLib/cert/*
+!third_party/AuthLib/include/.gitkeep
+!third_party/AuthLib/lib/.gitkeep
+!third_party/AuthLib/cert/.gitkeep
+
+# CryptoLib is local vendor dependency and must not be committed.
+third_party/CryptoLib/

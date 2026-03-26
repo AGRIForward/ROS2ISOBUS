@@ -20,13 +20,17 @@
 
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <string>
 
-#include "ros2_isobus/ISOBUSframe.hpp"
 #include "builtin_interfaces/msg/time.hpp"
+#include "ros2_isobus/msg/isobus_frame.hpp"
 
 namespace ros2_isobus
 {
+
+using ByteArray8 = std::array<std::uint8_t, 8>;
 
 /*
  *

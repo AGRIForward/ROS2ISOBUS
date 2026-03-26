@@ -22,7 +22,7 @@ Topics
   - `ISOBUS/nmea2000/cog_sog` (`TwistStamped`)  
   - `ISOBUS/nmea2000/rapid_position` (`NavSatFix`)  
   - `ISOBUS/nmea2000/attitude` (`Vector3Stamped`)  
-- Subscribes: `ISOBUS/bus_frames` (`IsobusFrame`)
+- Subscribes: `ISOBUS/bus_rx_frames` (`IsobusFrame`)
 
 Messages (custom/used)
 - `sensor_msgs/NavSatFix`, `diagnostic_msgs/DiagnosticArray`, `geometry_msgs/TwistStamped`, `geometry_msgs/Vector3Stamped`: standard ROS outputs.

@@ -20,8 +20,31 @@
 
 #include "AddressManager.hpp"
 
+#include <algorithm>
+#include <cstddef>
+#include <sstream>
+
 namespace ros2_isobus
 {
+
+ByteArray8 hex_to_byte_array(const std::string & hex)
+{
+  ByteArray8 result{};
+  std::size_t idx = 0;
+  for (std::size_t i = 0; i < result.size() && (idx + 1) < hex.size(); ++i, idx += 2) {
+    const auto byte = hex.substr(idx, 2);
+    result[i] = static_cast<std::uint8_t>(std::stoul(byte, nullptr, 16));
+  }
+  return result;
+}
+
+std::string to_hex(std::uint32_t value)
+{
+  std::ostringstream oss;
+  oss << std::hex << std::uppercase << value;
+  return oss.str();
+}
+
 AddressManager::AddressManager(const ByteArray8 & name, std::uint8_t preferred_address)
 : isobusName_(name), address_(preferred_address)
 {}
@@ -74,14 +97,14 @@ std::uint8_t AddressManager::getMySA() const
   if (state_ == NameState::ADDRESS_CLAIMED) {
     return address_;
   }
-  return 0;
+  return 0xFE;
 }
 
 std::uint8_t AddressManager::getSA(const ByteArray8 & name) const
 {
   const auto it = addressbook_.find(name);
   if (it == addressbook_.end()) {
-    return 0;
+    return 0xFE;
   }
   return it->second;
 }

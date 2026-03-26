@@ -21,6 +21,9 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -28,8 +31,10 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-#include "ros2_isobus/ISOBUSframe.hpp"
+#include "ros2_isobus/msg/isobus_address_status.hpp"
 #include "ros2_isobus/msg/isobus_frame.hpp"
+#include "ros2_isobus/msg/isobus_tp_frame.hpp"
+#include "TransportProtocol.hpp"
 
 namespace ros2_isobus
 {
@@ -51,6 +56,8 @@ public:
 private:
     void openSocket();                     // Initialize and bind SocketCAN interface.
     void handleTx(const msg::IsobusFrame &msg); // Send outgoing frames to the CAN bus.
+    void handleTpTx(const msg::IsobusTpFrame &msg); // Send TP/ETP payloads.
+    void sendFrame(const msg::IsobusFrame & msg); // Thread-safe CAN write.
     void readLoop();                       // Blocking read/publish loop.
 
     std::string interface_;
@@ -58,9 +65,22 @@ private:
     std::atomic<bool> running_{true};
     int socketFd_ = -1;
     std::thread readerThread_;
+    std::mutex socketMutex_;
 
     rclcpp::Publisher<msg::IsobusFrame>::SharedPtr rxPublisher_;
+    rclcpp::Publisher<msg::IsobusTpFrame>::SharedPtr rxTpPublisher_;
     rclcpp::Subscription<msg::IsobusFrame>::SharedPtr txSubscriber_;
+    rclcpp::Subscription<msg::IsobusTpFrame>::SharedPtr txTpSubscriber_;
+    rclcpp::Subscription<msg::IsobusAddressStatus>::SharedPtr addressStatusSubscriber_;
+    rclcpp::TimerBase::SharedPtr tpTimer_;
+
+    std::unique_ptr<TransportProtocol> tp_;
+    // TX diagnostics.
+    std::uint64_t tx_attempts_ = 0;
+    std::uint64_t tx_ok_ = 0;
+    std::uint64_t tx_fail_ = 0;
+    std::uint64_t tx_short_write_ = 0;
+    int tx_last_errno_ = 0;
 };
 
 }  // namespace ros2_isobus

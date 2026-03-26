@@ -13,7 +13,7 @@ Standards / PGNs
 Topics  
 - `ISOBUS/address_manager/status` (`IsobusAddressStatus`): current SA and state.  
 - `ISOBUS/address_manager/address_book` (`IsobusAddressBook`): full NAME/SA list (latched).  
-- `ISOBUS/bus_tx_frames` / `ISOBUS/bus_frames`: raw ISOBUS frames (via CanBridge).
+- `ISOBUS/bus_tx_frames` / `ISOBUS/bus_rx_frames`: raw ISOBUS frames (via CanBridge).
 
 Messages (custom)
 - `IsobusAddressStatus`: `sa`, `state` — our claimed address and FSM state. 

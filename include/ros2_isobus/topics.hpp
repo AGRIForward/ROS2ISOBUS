@@ -52,6 +52,18 @@ constexpr char kTECUCurvatureCommandTopic[] = "ISOBUS/tecu/commands/curvature";
 constexpr char kTECURearHitchCommandTopic[] = "ISOBUS/tecu/commands/rear_hitch";
 constexpr char kTECURearPtoCommandTopic[] = "ISOBUS/tecu/commands/rear_pto";
 
+constexpr char kTIMCruiseStatusTopic[] = "ISOBUS/tim/cruise_status";
+constexpr char kTIMCurvatureStatusTopic[] = "ISOBUS/tim/curvature_status";
+constexpr char kTIMRearHitchStatusTopic[] = "ISOBUS/tim/rear_hitch_status";
+constexpr char kTIMRearPtoStatusTopic[] = "ISOBUS/tim/rear_pto_status";
+constexpr char kTIMAuxValveStatusTopic[] = "ISOBUS/tim/aux_valve_status";
+
+constexpr char kTIMCruiseCommandTopic[] = "ISOBUS/tim/commands/cruise";
+constexpr char kTIMCurvatureCommandTopic[] = "ISOBUS/tim/commands/curvature";
+constexpr char kTIMRearHitchCommandTopic[] = "ISOBUS/tim/commands/rear_hitch";
+constexpr char kTIMRearPtoCommandTopic[] = "ISOBUS/tim/commands/rear_pto";
+constexpr char kTIMAuxValveCommandTopic[] = "ISOBUS/tim/commands/aux_valve";
+
 constexpr char kNmea2000FrameTopic[] = "ISOBUS/nmea2000/frames";
 constexpr char kNmea2000DiagnosticsTopic[] = "ISOBUS/nmea2000/diagnostics";
 constexpr char kNmea2000GnssPositionTopic[] = "ISOBUS/nmea2000/gnss_position_data";
@@ -60,6 +72,8 @@ constexpr char kNmea2000CogSogTopic[] = "ISOBUS/nmea2000/cog_sog";
 constexpr char kNmea2000AttitudeTopic[] = "ISOBUS/nmea2000/attitude";
 constexpr char kNmea2000RapidPositionTopic[] = "ISOBUS/nmea2000/rapid_position";
 
-constexpr char kBusRxTopic[] = "ISOBUS/bus_frames";
+constexpr char kBusRxTopic[] = "ISOBUS/bus_rx_frames";
 constexpr char kBusTxTopic[] = "ISOBUS/bus_tx_frames";
+constexpr char kBusRxTpTopic[] = "ISOBUS/bus_rx_tp_frames";
+constexpr char kBusTxTpTopic[] = "ISOBUS/bus_tx_tp_frames";
 }  // namespace ros2_isobus
