@@ -306,6 +306,7 @@ public:
   std::uint8_t rear_pto_automation_status() const { return actuals_.rear_pto_automation_status; }
   std::uint8_t rear_hitch_automation_status() const { return actuals_.rear_hitch_automation_status; }
   const Actuals & actuals() const { return actuals_; }
+  const FunctionConfig & function_config() const { return cfg_; }
 
 protected:
   // Platform hooks implemented by ROS2 wrapper.
@@ -315,6 +316,7 @@ protected:
   virtual void logInfo(const std::string & msg) {}
   virtual void logWarn(const std::string & msg) {}
   virtual void logError(const std::string & msg) {}
+  virtual void publish_function_status(std::uint8_t fn) {}
 
 private:
   enum class RequestMode : std::uint8_t;

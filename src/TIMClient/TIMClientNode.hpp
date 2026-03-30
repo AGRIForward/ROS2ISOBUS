@@ -74,7 +74,7 @@ private:
     void logInfo(const std::string & msg) override;
     void logWarn(const std::string & msg) override;
     void logError(const std::string & msg) override;
-    void publish_tim_statuses();
+    void publish_function_status(std::uint8_t fn) override;
     void refresh_operator_enable();
     void apply_command_timeouts();
 

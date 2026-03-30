@@ -1647,6 +1647,7 @@ void TimClient::handle_v1_function_status(const ros2_isobus::msg::IsobusFrame & 
       actuals_.aux_valid[i] = true;
       actuals_.aux_automation_status[i] = automation_status;
       observe_v1_status(reflected_counter, automation_status);
+      publish_function_status(fn);
       return;
     }
   }
@@ -1656,6 +1657,7 @@ void TimClient::handle_v1_function_status(const ros2_isobus::msg::IsobusFrame & 
     actuals_.speed_valid = true;
     actuals_.speed_automation_status = automation_status;
     observe_v1_status(reflected_counter, automation_status);
+    publish_function_status(fn);
     return;
   }
 
@@ -1664,6 +1666,7 @@ void TimClient::handle_v1_function_status(const ros2_isobus::msg::IsobusFrame & 
     actuals_.curvature_valid = true;
     actuals_.curvature_automation_status = automation_status;
     observe_v1_status(reflected_counter, automation_status);
+    publish_function_status(fn);
     return;
   }
 
@@ -1672,6 +1675,7 @@ void TimClient::handle_v1_function_status(const ros2_isobus::msg::IsobusFrame & 
     actuals_.rear_pto_valid = true;
     actuals_.rear_pto_automation_status = automation_status;
     observe_v1_status(reflected_counter, automation_status);
+    publish_function_status(fn);
     return;
   }
 
@@ -1680,6 +1684,7 @@ void TimClient::handle_v1_function_status(const ros2_isobus::msg::IsobusFrame & 
     actuals_.rear_hitch_valid = true;
     actuals_.rear_hitch_automation_status = automation_status;
     observe_v1_status(reflected_counter, automation_status);
+    publish_function_status(fn);
     return;
   }
 }
@@ -1700,11 +1705,13 @@ void TimClient::handle_v2_function_status(const ros2_isobus::msg::IsobusFrame & 
       const std::uint8_t automation_status = fr.data[2] & 0x0F;
       actuals_.aux_automation_status[i] = automation_status;
       observe_v2_status(automation_status);
+      publish_function_status(fn);
       return;
     }
     if (msg_type == V2_MSG_PROCESS_DATA) {
       actuals_.aux_flow_pct[i] = dec_u16(u16_le(fr.data, 4), 0.004f, -128.512f);
       actuals_.aux_valid[i] = true;
+      publish_function_status(fn);
       return;
     }
     return;
@@ -1716,9 +1723,11 @@ void TimClient::handle_v2_function_status(const ros2_isobus::msg::IsobusFrame & 
       const std::uint8_t automation_status = fr.data[2] & 0x0F;
       actuals_.rear_pto_automation_status = automation_status;
       observe_v2_status(automation_status);
+      publish_function_status(fn);
     } else if (msg_type == V2_MSG_PROCESS_DATA) {
       actuals_.rear_pto_rpm = dec_u16(u16_le(fr.data, 4), 0.125f, -4016.0f);
       actuals_.rear_pto_valid = true;
+      publish_function_status(fn);
     }
     return;
   }
@@ -1729,9 +1738,11 @@ void TimClient::handle_v2_function_status(const ros2_isobus::msg::IsobusFrame & 
       const std::uint8_t automation_status = fr.data[2] & 0x0F;
       actuals_.rear_hitch_automation_status = automation_status;
       observe_v2_status(automation_status);
+      publish_function_status(fn);
     } else if (msg_type == V2_MSG_PROCESS_DATA) {
       actuals_.rear_hitch_pct = dec_u16(u16_le(fr.data, 4), 0.01f, 0.0f);
       actuals_.rear_hitch_valid = true;
+      publish_function_status(fn);
     }
     return;
   }
@@ -1742,9 +1753,11 @@ void TimClient::handle_v2_function_status(const ros2_isobus::msg::IsobusFrame & 
       const std::uint8_t automation_status = fr.data[2] & 0x0F;
       actuals_.speed_automation_status = automation_status;
       observe_v2_status(automation_status);
+      publish_function_status(fn);
     } else if (msg_type == V2_MSG_PROCESS_DATA) {
       actuals_.speed_mps = dec_u16(u16_le(fr.data, 4), 0.001f, -32.128f);
       actuals_.speed_valid = true;
+      publish_function_status(fn);
     }
     return;
   }
@@ -1755,9 +1768,11 @@ void TimClient::handle_v2_function_status(const ros2_isobus::msg::IsobusFrame & 
       const std::uint8_t automation_status = fr.data[2] & 0x0F;
       actuals_.curvature_automation_status = automation_status;
       observe_v2_status(automation_status);
+      publish_function_status(fn);
     } else if (msg_type == V2_MSG_PROCESS_DATA) {
       actuals_.curvature_km_inv = dec_u16(u16_le(fr.data, 4), 0.25f, -8032.0f);
       actuals_.curvature_valid = true;
+      publish_function_status(fn);
     }
     return;
   }

@@ -345,7 +345,6 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
         [this]() {
             apply_command_timeouts();
             process();
-            publish_tim_statuses();
         });
 
     const bool graceful_shutdown_on_exit =
@@ -596,10 +595,11 @@ void TIMClientROS2::refresh_operator_enable()
     set_operator_enable(any_enable);
 }
 
-void TIMClientROS2::publish_tim_statuses()
+void TIMClientROS2::publish_function_status(std::uint8_t fn)
 {
-    // Publish normalized ROS status view from TIM automation statuses (AEF 023 10.2.2 domain).
+    // Publish only the function that was updated from incoming TIM function status.
     const auto & a = actuals();
+    const auto & cfg = function_config();
     const auto is_fault = [](std::uint8_t s) {
         return s == TIM_AUTO_FAULT;
     };
@@ -615,7 +615,7 @@ void TIMClientROS2::publish_tim_statuses()
         return s == TIM_AUTO_ACTIVE_LIMIT_LOW;
     };
 
-    if (cruise_status_pub_) {
+    if (cfg.enable_speed && fn == cfg.speed_fn_id && cruise_status_pub_) {
         const auto auto_status = speed_automation_status();
         msg::TimCruiseStatus st;
         st.measured_speed = a.speed_mps;
@@ -628,8 +628,9 @@ void TIMClientROS2::publish_tim_statuses()
         st.limited_low = is_limited_low(auto_status);
         st.fault = is_fault(auto_status);
         cruise_status_pub_->publish(st);
+        return;
     }
-    if (curvature_status_pub_) {
+    if (cfg.enable_curvature && fn == cfg.curvature_fn_id && curvature_status_pub_) {
         const auto auto_status = curvature_automation_status();
         msg::TimCurvatureStatus st;
         st.measured_curvature_km_inv = a.curvature_km_inv;
@@ -641,8 +642,9 @@ void TIMClientROS2::publish_tim_statuses()
         st.limited_low = is_limited_low(auto_status);
         st.fault = is_fault(auto_status);
         curvature_status_pub_->publish(st);
+        return;
     }
-    if (rear_hitch_status_pub_) {
+    if (cfg.enable_rear_hitch && fn == cfg.rear_hitch_fn_id && rear_hitch_status_pub_) {
         const auto auto_status = rear_hitch_automation_status();
         msg::TimRearHitchStatus st;
         st.position_percent = a.rear_hitch_pct;
@@ -654,8 +656,9 @@ void TIMClientROS2::publish_tim_statuses()
         st.limited_low = is_limited_low(auto_status);
         st.fault = is_fault(auto_status);
         rear_hitch_status_pub_->publish(st);
+        return;
     }
-    if (rear_pto_status_pub_) {
+    if (cfg.enable_rear_pto && fn == cfg.rear_pto_fn_id && rear_pto_status_pub_) {
         const auto auto_status = rear_pto_automation_status();
         msg::TimRearPtoStatus st;
         st.rpm = a.rear_pto_rpm;
@@ -667,10 +670,11 @@ void TIMClientROS2::publish_tim_statuses()
         st.limited_low = is_limited_low(auto_status);
         st.fault = is_fault(auto_status);
         rear_pto_status_pub_->publish(st);
+        return;
     }
     if (aux_valve_status_pub_) {
-        for (std::size_t i = 0; i < MAX_AUX; ++i) {
-            if (!a.aux_valid[i]) continue;
+        for (std::size_t i = 0; i < cfg.num_aux && i < MAX_AUX; ++i) {
+            if (fn != cfg.aux_fn_id[i]) continue;
             const auto auto_status = aux_automation_status(i);
             msg::TimAuxValveStatus st;
             st.valve_number = static_cast<std::uint8_t>(i + 1U);
@@ -683,6 +687,7 @@ void TIMClientROS2::publish_tim_statuses()
             st.limited_low = is_limited_low(auto_status);
             st.fault = is_fault(auto_status);
             aux_valve_status_pub_->publish(st);
+            return;
         }
     }
 }
