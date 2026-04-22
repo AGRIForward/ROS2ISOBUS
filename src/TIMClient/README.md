@@ -64,6 +64,7 @@ Parameters
   - `dummy_auth.period_ms`, `dummy_auth.implemented_version`, `dummy_auth.minimum_version`
   - `authlib.period_ms`, `authlib.implemented_version`, `authlib.minimum_version`
   - `authlib.strict` (default `false`): fail authentication on protocol violations; if `false`, log warnings and continue when possible
+  - `authlib.debug_auth_payloads` (default `false`): enable verbose auth payload debug logs for finalize/signed-challenge troubleshooting
   - `authlib.max_slice_iterations` (default `1024`): max slice-continue iterations for AuthLib long-running operations
   - `authlib.root_cert_path`
   - `authlib.client_testlab_cert_path`
@@ -111,6 +112,11 @@ ros2 run ros2_isobus tim_client_node
 Parameter file
 - TIM default launch parameters are stored in shared file `config/all_nodes_tim_params.yaml`.
 - Update `authlib.root_cert_path`, `authlib.client_*_cert_path`, and `authlib.client_private_key_hex` to match your certificate set.
+- Validate certificate/key interoperability before runtime with:
+```bash
+./scripts/tim_auth_compat_check.py --params-file config/all_nodes_tim_params.yaml
+```
+  - For CI or machine parsing: `./scripts/tim_auth_compat_check.py --output json --quiet`
 - Use with node run:
 ```bash
 ros2 run ros2_isobus tim_client_node --ros-args --params-file src/Ros2ISOBUS/config/all_nodes_tim_params.yaml

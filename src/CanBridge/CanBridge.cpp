@@ -306,6 +306,9 @@ void CanBridge::readLoop()
                 std::array<std::uint8_t, 8> payload;
                 std::copy(std::begin(frame.data), std::end(frame.data), payload.begin());
                 auto isobus_msg = make_isobus_frame_from_can(frame.can_id, payload);
+                const auto rx_now_ns = now().nanoseconds();
+                isobus_msg.timestamp.sec = static_cast<std::int32_t>(rx_now_ns / 1000000000LL);
+                isobus_msg.timestamp.nanosec = static_cast<std::uint32_t>(rx_now_ns % 1000000000LL);
                 rxPublisher_->publish(isobus_msg);
                 if (tp_)
                     tp_->handleRx(isobus_msg);

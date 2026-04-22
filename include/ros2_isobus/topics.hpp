@@ -70,7 +70,7 @@ constexpr char kNmea2000GnssPositionTopic[] = "ISOBUS/nmea2000/gnss_position_dat
 constexpr char kNmea2000PseudoNoiseTopic[] = "ISOBUS/nmea2000/gnss_pseudo_noise_statistics";
 constexpr char kNmea2000CogSogTopic[] = "ISOBUS/nmea2000/cog_sog";
 constexpr char kNmea2000AttitudeTopic[] = "ISOBUS/nmea2000/attitude";
-constexpr char kNmea2000RapidPositionTopic[] = "ISOBUS/nmea2000/rapid_position";
+constexpr char kNmea2000RapidPositionTopic[] = "ISOBUS/nmea2000/gnss_position_data_rapid";
 
 constexpr char kBusRxTopic[] = "ISOBUS/bus_rx_frames";
 constexpr char kBusTxTopic[] = "ISOBUS/bus_tx_frames";

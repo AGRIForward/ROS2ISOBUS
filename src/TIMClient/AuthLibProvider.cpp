@@ -210,6 +210,16 @@ std::string to_hex(const std::uint8_t * data, std::size_t len)
   return oss.str();
 }
 
+std::string to_hex_prefix(const std::vector<std::uint8_t> & data, std::size_t max_len)
+{
+  const std::size_t count = std::min<std::size_t>(data.size(), max_len);
+  std::string out = to_hex(data.data(), count);
+  if (data.size() > count) {
+    out += "...";
+  }
+  return out;
+}
+
 bool extract_public_key_hex_from_der(const std::vector<std::uint8_t> & cert_der, std::string & out_hex)
 {
   // X.509 Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }
@@ -297,6 +307,7 @@ AuthLibProvider::AuthLibProvider(
   std::uint8_t implemented_version,
   std::uint8_t minimum_version,
   bool strict_mode,
+  bool debug_auth_payloads,
   std::uint16_t client_cert_payload_max_len,
   std::uint16_t max_slice_iterations,
   const std::string & root_cert_path,
@@ -308,6 +319,7 @@ AuthLibProvider::AuthLibProvider(
   implemented_version_(implemented_version),
   minimum_version_(minimum_version),
   strict_mode_(strict_mode),
+  debug_auth_payloads_(debug_auth_payloads),
   client_cert_payload_max_len_(client_cert_payload_max_len),
   max_slice_iterations_(std::max<std::uint16_t>(1U, max_slice_iterations)),
   root_cert_path_(root_cert_path),
@@ -318,6 +330,9 @@ AuthLibProvider::AuthLibProvider(
   auth_connection_version_ = minimum_version_;
   if (!init_authlib() || !load_certificates()) {
     failed_ = true;
+  }
+  if (debug_auth_payloads_) {
+    logInfo("TIM auth debug: extended payload logging enabled");
   }
 }
 
@@ -476,6 +491,11 @@ bool AuthLibProvider::derive_common_secret()
     return false;
   }
   common_secret_ready_ = true;
+  if (debug_auth_payloads_) {
+    logInfo(
+      "TIM auth debug: common secret derived (prefix16=" +
+      to_hex(common_secret_.data(), 16U) + ")");
+  }
   return true;
 }
 
@@ -494,6 +514,11 @@ bool AuthLibProvider::compute_client_signed_challenge()
     return false;
   }
   challenge_signed_local_ = true;
+  if (debug_auth_payloads_) {
+    logInfo(
+      "TIM auth debug: client signed challenge computed hex=" +
+      to_hex(client_signed_challenge_.data(), client_signed_challenge_.size()));
+  }
   return true;
 }
 
@@ -1023,7 +1048,18 @@ void AuthLibProvider::send_round_requests(std::uint32_t now_ms)
     if (pending_server_finalize_request_) {
       // Server explicitly requested signed challenge; respond immediately.
       logInfo("TIM auth: server requested signed challenge, sending response payload");
-      sendTpFrame(make_client_finalize_response_tp(requested_finalize_round_));
+      const auto finalize_tp = make_client_finalize_response_tp(requested_finalize_round_);
+      if (debug_auth_payloads_) {
+        const std::size_t sig_len = (finalize_tp.data.size() >= 7U) ? (finalize_tp.data.size() - 7U) : 0U;
+        logInfo(
+          "TIM auth debug: tx finalize TP round=" +
+          std::to_string(static_cast<unsigned>(requested_finalize_round_)) +
+          " msg=0x" + to_hex(finalize_tp.data.data(), 1U) +
+          " sig_len=" + std::to_string(static_cast<unsigned>(sig_len)) +
+          " sig_hex=" +
+          ((sig_len > 0U) ? to_hex(&finalize_tp.data[7], std::min<std::size_t>(sig_len, 16U)) : ""));
+      }
+      sendTpFrame(finalize_tp);
       client_finalize_payload_sent_ = true;
       pending_server_finalize_request_ = false;
       step_ = Step::WaitFinalizeTp;
@@ -1033,7 +1069,15 @@ void AuthLibProvider::send_round_requests(std::uint32_t now_ms)
     if (!finalize_request_sent_) {
       // Interop fallback: proactively request signed challenge if server has not
       // yet sent finalize trigger.
-      sendFrame(make_finalize_trigger_response_frame(requested_finalize_round_));
+      const auto finalize_fr = make_finalize_trigger_response_frame(requested_finalize_round_);
+      if (debug_auth_payloads_) {
+        logInfo(
+          "TIM auth debug: tx finalize trigger msg=0x" + to_hex(&finalize_fr.data[0], 1U) +
+          " err=" + std::to_string(static_cast<unsigned>(finalize_fr.data[1])) +
+          " auth=0x" + to_hex(&finalize_fr.data[2], 1U) +
+          " round=" + std::to_string(static_cast<unsigned>(requested_finalize_round_)));
+      }
+      sendFrame(finalize_fr);
       expected_server_finalize_round_ = requested_finalize_round_;
       finalize_request_sent_ = true;
       step_deadline_ms_ = now_ms + kStepTimeoutMs;
@@ -1110,6 +1154,14 @@ void AuthLibProvider::on_frame(const ros2_isobus::msg::IsobusFrame & fr)
     return;
   }
   const bool finalize_short_msg = (msg == kMsgAuthServerFinalize);
+  if (debug_auth_payloads_) {
+    logInfo(
+      "TIM auth debug: rx short msg=0x" + to_hex(&msg, 1U) +
+      " err=" + std::to_string(static_cast<unsigned>(fr.data[1])) +
+      " auth=0x" + to_hex(&fr.data[2], 1U) +
+      " round_raw=" + std::to_string(static_cast<unsigned>(fr.data[4])) +
+      " step=" + std::to_string(static_cast<unsigned>(step_)));
+  }
 
   if (spec->require_zero_error && fr.data[1] != 0x00U) {
     if (protocol_violation(
@@ -1254,6 +1306,12 @@ void AuthLibProvider::on_tp_payload(std::uint32_t pgn, const std::vector<std::ui
         " carries non-zero error code " + std::to_string(static_cast<unsigned>(payload[1])))) return;
     // Non-strict mode: allow payload processing despite non-zero error field.
   }
+  if (debug_auth_payloads_) {
+    logInfo(
+      "TIM auth debug: rx TP msg=0x" + to_hex(&msg, 1U) +
+      " len=" + std::to_string(payload.size()) +
+      " head=" + to_hex_prefix(payload, 16U));
+  }
 
   if (spec->kind == TpMsgKind::RandomPayload) {
     got_server_tp_04_ = true;
@@ -1270,6 +1328,11 @@ void AuthLibProvider::on_tp_payload(std::uint32_t pgn, const std::vector<std::ui
     }
     std::copy(payload.begin() + 7, payload.begin() + 7 + rnd_len, server_random_challenge_.begin());
     server_random_valid_ = true;
+    if (debug_auth_payloads_) {
+      logInfo(
+        "TIM auth debug: server random challenge hex=" +
+        to_hex(server_random_challenge_.data(), server_random_challenge_.size()));
+    }
     logInfo("TIM auth: received TP server random payload");
   } else if (spec->kind == TpMsgKind::CertPayload) {
     got_server_tp_02_ = true;
@@ -1341,6 +1404,13 @@ void AuthLibProvider::on_tp_payload(std::uint32_t pgn, const std::vector<std::ui
     }
     std::copy(payload.begin() + 7, payload.begin() + 7 + sig_len, server_signed_challenge_.begin());
     server_signed_valid_ = true;
+    if (debug_auth_payloads_) {
+      logInfo(
+        "TIM auth debug: server signed challenge round=" +
+        std::to_string(static_cast<unsigned>(round)) +
+        " sig_hex=" +
+        to_hex(server_signed_challenge_.data(), server_signed_challenge_.size()));
+    }
     logInfo("TIM auth: received TP server finalize payload");
     if (!pending_server_finalize_request_ && step_ == Step::WaitFinalizeTrigger) {
       // Interop: some servers send finalize TP payload before short finalize trigger.

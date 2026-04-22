@@ -1,5 +1,6 @@
 # ISOBUS CAN frame wrapper (transport-agnostic helper)
 # Standard: ISO 11783 / SAE J1939 framing (PGN/priority/SA/data)
+builtin_interfaces/Time timestamp
 uint8 priority          # J1939/ISOBUS priority (0=highest)
 bool page               # True when extended PGN (PDU2)
 uint32 pgn              # Parameter Group Number

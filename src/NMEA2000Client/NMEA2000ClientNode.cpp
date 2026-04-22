@@ -32,6 +32,7 @@ NMEA2000ClientROS2::NMEA2000ClientROS2(const rclcpp::NodeOptions &options)
     frame_id_ = declare_parameter<std::string>("frame_id", "map");
 
     gnss_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(ros2_isobus::kNmea2000GnssPositionTopic, 10);
+    rapid_position_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(ros2_isobus::kNmea2000RapidPositionTopic, 10);
     pseudo_noise_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(ros2_isobus::kNmea2000PseudoNoiseTopic, 10);
     cog_sog_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(ros2_isobus::kNmea2000CogSogTopic, 10);
     attitude_pub_ = create_publisher<geometry_msgs::msg::Vector3Stamped>(ros2_isobus::kNmea2000AttitudeTopic, 10);
@@ -69,6 +70,7 @@ void NMEA2000ClientROS2::publishNavSatFix()
 
     if (gnss_pub_)
         gnss_pub_->publish(msg);
+
 }
 
 void NMEA2000ClientROS2::publishCogSog()
@@ -95,9 +97,9 @@ void NMEA2000ClientROS2::publishRapidPosition()
     msg.status.status = GPSFix >= 4 ? sensor_msgs::msg::NavSatStatus::STATUS_FIX : sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX;
     msg.status.service = gnss_service(GPSType);
     msg.position_covariance_type = sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN;
-    
-    if (gnss_pub_)
-        gnss_pub_->publish(msg);
+ 
+    if (rapid_position_pub_)
+        rapid_position_pub_->publish(msg);
 }
 
 void NMEA2000ClientROS2::publishAttitude()

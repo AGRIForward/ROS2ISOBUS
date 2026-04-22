@@ -79,6 +79,7 @@ tim_client_node:
     # Authentication mode: None | Dummy | AuthLib
     auth_mode: AuthLib
     authlib.strict: false
+    authlib.debug_auth_payloads: true
     authlib.max_slice_iterations: 50000
     # Client certificate payload max bytes in TP response (0 = full DER, 26 = testbench interop).
     authlib.client_cert_payload_max_len: 0

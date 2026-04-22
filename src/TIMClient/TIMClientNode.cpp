@@ -153,6 +153,8 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
     const auto authlib_minimum_version = static_cast<std::uint8_t>(
         declare_parameter<int>("authlib.minimum_version", 2));
     const bool authlib_strict = declare_parameter<bool>("authlib.strict", false);
+    const bool authlib_debug_auth_payloads =
+        declare_parameter<bool>("authlib.debug_auth_payloads", false);
     // Maximum bytes sent in client certificate TP payload:
     //  - 0: send full DER certificate
     //  - N: truncate payload to N bytes (interop/testing)
@@ -214,6 +216,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
             authlib_implemented_version,
             authlib_minimum_version,
             authlib_strict,
+            authlib_debug_auth_payloads,
             authlib_client_cert_payload_max_len,
             authlib_max_slice_iterations,
             authlib_root_cert_path,

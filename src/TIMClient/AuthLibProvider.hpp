@@ -48,6 +48,7 @@ public:
     std::uint8_t implemented_version,
     std::uint8_t minimum_version,
     bool strict_mode,
+    bool debug_auth_payloads,
     std::uint16_t client_cert_payload_max_len,
     std::uint16_t max_slice_iterations,
     const std::string & root_cert_path,
@@ -118,6 +119,7 @@ private:
   std::uint8_t retries_{0};
   Step step_{Step::WaitRandomTrigger};
   bool strict_mode_{true};
+  bool debug_auth_payloads_{false};
   std::uint16_t client_cert_payload_max_len_{0U};
   std::uint16_t max_slice_iterations_{64U};
   bool restart_sent_{false};

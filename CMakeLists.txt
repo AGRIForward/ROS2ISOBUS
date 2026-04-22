@@ -13,6 +13,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
@@ -146,6 +147,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TimRearPtoStatus.msg"
   "msg/TimAuxValveCommand.msg"
   "msg/TimAuxValveStatus.msg"
+  DEPENDENCIES builtin_interfaces
 )
 
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")

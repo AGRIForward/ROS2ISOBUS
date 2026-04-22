@@ -20,7 +20,7 @@ Topics
   - `ISOBUS/nmea2000/gnss_position_data` (`NavSatFix`)  
   - `ISOBUS/nmea2000/gnss_pseudo_noise_statistics` (`DiagnosticArray`)  
   - `ISOBUS/nmea2000/cog_sog` (`TwistStamped`)  
-  - `ISOBUS/nmea2000/rapid_position` (`NavSatFix`)  
+  - `ISOBUS/nmea2000/gnss_position_data_rapid` (`NavSatFix`)  
   - `ISOBUS/nmea2000/attitude` (`Vector3Stamped`)  
 - Subscribes: `ISOBUS/bus_rx_frames` (`IsobusFrame`)
 

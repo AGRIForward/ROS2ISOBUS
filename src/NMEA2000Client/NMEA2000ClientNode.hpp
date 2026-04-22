@@ -57,6 +57,7 @@ private:
     void publishRapidPosition() override;
 
     rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr gnss_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr rapid_position_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cog_sog_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr attitude_pub_;
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr pseudo_noise_pub_;
