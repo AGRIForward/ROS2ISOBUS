@@ -103,11 +103,13 @@ std::uint16_t min_u16(std::uint16_t a, std::uint16_t b)
 TransportProtocol::TransportProtocol(const Params & params,
                                      SendCallback send_cb,
                                      PublishTpCallback publish_cb,
+                                     PublishTpTxStatusCallback publish_tx_status_cb,
                                      rclcpp::Logger logger,
                                      rclcpp::Clock::SharedPtr clock)
 : params_(params),
   send_cb_(std::move(send_cb)),
   publish_cb_(std::move(publish_cb)),
+  publish_tx_status_cb_(std::move(publish_tx_status_cb)),
   logger_(logger),
   clock_(std::move(clock))
 {}
@@ -586,6 +588,7 @@ void TransportProtocol::handleTxRequest(const msg::IsobusTpFrame & frame)
 
     const auto key = makeTxKey(proto, session.sa, session.da, session.pgn);
     tx_sessions_[key] = session;
+    publishTxStatus(tx_sessions_[key], msg::IsobusTpTxStatus::STATE_STARTED);
 
     if (session.bam)
     {
@@ -737,6 +740,7 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
                 tmp.pgn = session.pgn;
                 tmp.priority = session.priority;
                 abortRx(tmp, kAbortCtsDuringTransfer);
+                publishTxStatus(session, msg::IsobusTpTxStatus::STATE_ABORTED);
                 tx_sessions_.erase(it);
                 return;
             }
@@ -764,6 +768,7 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
                 tmp.pgn = session.pgn;
                 tmp.priority = session.priority;
                 abortRx(tmp, kAbortCtsDuringTransfer);
+                publishTxStatus(session, msg::IsobusTpTxStatus::STATE_ABORTED);
                 tx_sessions_.erase(it);
                 return;
             }
@@ -786,6 +791,7 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
                 tmp.pgn = session.pgn;
                 tmp.priority = session.priority;
                 abortRx(tmp, kAbortCtsDuringTransfer);
+                publishTxStatus(session, msg::IsobusTpTxStatus::STATE_ABORTED);
                 tx_sessions_.erase(it);
                 return;
             }
@@ -815,7 +821,10 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
         continueRtsCts(session, allowed, effective_next_seq);
         if (session.next_seq > session.total_packets)
         {
-            finishTxSession(key);
+            // Destination-specific RTS/CTS transfer is only complete after peer EOMACK/EOMA.
+            // Keep session alive and wait control ack (ISO 11783-3 TP/ETP).
+            session.awaiting_cts = true;
+            session.on_hold = false;
         }
         return;
     }
@@ -834,7 +843,9 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
             continueRtsCts(session, count, session.next_seq);
             if (session.next_seq > session.total_packets)
             {
-                finishTxSession(key);
+                // Destination-specific ETP transfer completion is acknowledged by EOMA.
+                session.awaiting_cts = true;
+                session.on_hold = false;
             }
         }
         return;
@@ -848,6 +859,7 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
 
     if (ctrl == kCtrlAbort)
     {
+        publishTxStatus(session, msg::IsobusTpTxStatus::STATE_ABORTED);
         tx_sessions_.erase(it);
         return;
     }
@@ -855,7 +867,31 @@ void TransportProtocol::handleTxControl(const msg::IsobusFrame & frame, Protocol
 
 void TransportProtocol::finishTxSession(const TxKey & key)
 {
-    tx_sessions_.erase(key);
+    auto it = tx_sessions_.find(key);
+    if (it != tx_sessions_.end())
+    {
+        publishTxStatus(it->second, msg::IsobusTpTxStatus::STATE_COMPLETED);
+        tx_sessions_.erase(it);
+    }
+}
+
+void TransportProtocol::publishTxStatus(const TxSession & session, std::uint8_t state)
+{
+    if (!publish_tx_status_cb_)
+    {
+        return;
+    }
+    msg::IsobusTpTxStatus out;
+    out.state = state;
+    out.pgn = session.pgn;
+    out.sa = session.sa;
+    out.da = session.da;
+    out.total_bytes = session.total_bytes;
+    out.total_packets = session.total_packets;
+    out.sent_packets = std::min(
+        session.next_seq > 0 ? session.next_seq - 1 : 0,
+        session.total_packets);
+    publish_tx_status_cb_(out);
 }
 
 // Compose and send TP/ETP connection-management CAN frame.
@@ -1022,6 +1058,7 @@ void TransportProtocol::tick()
                 tmp.priority = it->second.priority;
                 abortRx(tmp, kAbortTimeout);
             }
+            publishTxStatus(it->second, msg::IsobusTpTxStatus::STATE_ABORTED);
             it = tx_sessions_.erase(it);
         }
         else

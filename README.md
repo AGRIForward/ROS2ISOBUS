@@ -22,6 +22,7 @@ Overview
 - **TECU Class2/Class3 (legacy) Clients** (ISO 11783‑7/9): speed/hitch/PTO/guidance/cruise/AUX valve, custom ROS msgs. Docs: [src/TECUClient/README.md](src/TECUClient/README.md)
 - **TIMClient** (AEF TIM): TIM handshake/state machine + TIM function command/status ROS interfaces. Docs: [src/TIMClient/README.md](src/TIMClient/README.md)
 - **NMEA2000Client** (NMEA 2000): parses GNSS/COG/SOG/Attitude PGNs to ROS standard messages. Docs: [src/NMEA2000Client/README.md](src/NMEA2000Client/README.md)
+- **VTClient** (ISO 11783‑6): Virtual Terminal session/state machine, object-pool transfer, VT event/value ROS interfaces. Docs: [src/VTClient/README.md](src/VTClient/README.md)
 - **TestPanel**: keyboard‑driven debug UI that subscribes to telemetry and can emit either TECU or TIM commands. Docs: [src/TestPanel/README.md](src/TestPanel/README.md)
 
 Dependencies
@@ -53,6 +54,10 @@ All nodes with TIM enabled (TECU Class2 + TIM):
 ```bash
 ros2 launch ros2_isobus all_nodes_tim.launch.py
 ```
+All nodes with VT client enabled:
+```bash
+ros2 launch ros2_isobus all_nodes_vt.launch.py
+```
 TIM launch uses one shared parameter file for all launched nodes:
 - `config/all_nodes_tim_params.yaml` (installed to `share/ros2_isobus/config/all_nodes_tim_params.yaml`)
 - In that file, update `tim_client_node.authlib.*` certificate/key paths for your own setup.
@@ -68,6 +73,7 @@ ros2 run ros2_isobus can_bridge_node      # needs CAN interface (default can0)
 ros2 run ros2_isobus address_manager_node
 ros2 run ros2_isobus diagnostics_node
 ros2 run ros2_isobus nmea2000_node
+ros2 run ros2_isobus vt_client_node
 ros2 run ros2_isobus tecu_node -- --class3 | --class2
 ros2 run ros2_isobus tim_client_node
 ```
@@ -86,6 +92,7 @@ Key Parameters
 - TECU Class3: `command_mode` (direct/periodic/both), `valve_count`.
 - TIMClient: `auth_mode` (`None`/`Dummy`/`AuthLib`), `tim.enable_*`, `tim.aux_*`, `command_mode` (direct/periodic/both).
 - NMEA2000: `frame_id` for published messages.
+- VTClient: `xml_file`, `sa_local`, `sa_vt`, `vt_session_timeout_ms`, `vt_session_retries`.
 - TestPanel: `control_interface` (`tecu`/`tim`).
 
 

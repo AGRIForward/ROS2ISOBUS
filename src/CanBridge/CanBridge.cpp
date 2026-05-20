@@ -55,7 +55,8 @@ std::uint32_t make_can_id(const msg::IsobusFrame & frame)
            (frame.sa);
 }
 
-msg::IsobusFrame make_isobus_frame_from_can(std::uint32_t id, const std::array<std::uint8_t, 8> & payload)
+msg::IsobusFrame make_isobus_frame_from_can(
+    std::uint32_t id, const std::array<std::uint8_t, 8> & payload, std::uint8_t dlc)
 {
     msg::IsobusFrame out;
     out.sa = static_cast<std::uint8_t>((id >> 0) & 0xFF);
@@ -64,6 +65,7 @@ msg::IsobusFrame make_isobus_frame_from_can(std::uint32_t id, const std::array<s
     out.priority = static_cast<std::uint8_t>((id >> 26) & 0x07);
     out.pf = static_cast<std::uint8_t>((out.pgn >> 8) & 0xFF);
     out.ps = static_cast<std::uint8_t>((out.pgn >> 0) & 0xFF);
+    out.dlc = dlc;
     out.data = payload;
     return out;
 }
@@ -86,6 +88,7 @@ CanBridge::CanBridge()
 
     rxPublisher_ = create_publisher<msg::IsobusFrame>(kBusRxTopic, 100);
     rxTpPublisher_ = create_publisher<msg::IsobusTpFrame>(kBusRxTpTopic, 10);
+    tpTxStatusPublisher_ = create_publisher<msg::IsobusTpTxStatus>(kBusTxTpStatusTopic, 20);
     txSubscriber_ = create_subscription<msg::IsobusFrame>(
         kBusTxTopic, 200,
         std::bind(&CanBridge::handleTx, this, std::placeholders::_1));
@@ -106,6 +109,7 @@ CanBridge::CanBridge()
         tp_params,
         [this](const msg::IsobusFrame & f) { sendFrame(f); },
         [this](const msg::IsobusTpFrame & f) { if (rxTpPublisher_) rxTpPublisher_->publish(f); },
+        [this](const msg::IsobusTpTxStatus & s) { if (tpTxStatusPublisher_) tpTxStatusPublisher_->publish(s); },
         get_logger(),
         get_clock());
 
@@ -220,7 +224,8 @@ void CanBridge::sendFrame(const msg::IsobusFrame &msg)
     std::memset(&canMsg, 0, sizeof(canMsg));
     // Always send as 29-bit extended CAN ID
     canMsg.can_id = make_can_id(msg) | CAN_EFF_FLAG;
-    canMsg.can_dlc = 8;
+    // Use frame-provided DLC when set to valid CAN payload length, otherwise default to 8.
+    canMsg.can_dlc = (msg.dlc <= 8U && msg.dlc > 0U) ? msg.dlc : 8U;
     for (std::size_t i = 0; i < msg.data.size(); ++i)
     {
         canMsg.data[i] = msg.data[i];
@@ -305,7 +310,8 @@ void CanBridge::readLoop()
             {
                 std::array<std::uint8_t, 8> payload;
                 std::copy(std::begin(frame.data), std::end(frame.data), payload.begin());
-                auto isobus_msg = make_isobus_frame_from_can(frame.can_id, payload);
+                auto isobus_msg = make_isobus_frame_from_can(
+                    frame.can_id, payload, static_cast<std::uint8_t>(frame.can_dlc));
                 const auto rx_now_ns = now().nanoseconds();
                 isobus_msg.timestamp.sec = static_cast<std::int32_t>(rx_now_ns / 1000000000LL);
                 isobus_msg.timestamp.nanosec = static_cast<std::uint32_t>(rx_now_ns % 1000000000LL);

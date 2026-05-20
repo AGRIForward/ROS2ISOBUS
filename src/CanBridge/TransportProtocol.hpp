@@ -30,6 +30,7 @@
 
 #include "ros2_isobus/msg/isobus_frame.hpp"
 #include "ros2_isobus/msg/isobus_tp_frame.hpp"
+#include "ros2_isobus/msg/isobus_tp_tx_status.hpp"
 
 namespace ros2_isobus
 {
@@ -65,10 +66,12 @@ public:
     // CAN transport hooks provided by the caller.
     using SendCallback = std::function<void(const msg::IsobusFrame &)>;
     using PublishTpCallback = std::function<void(const msg::IsobusTpFrame &)>;
+    using PublishTpTxStatusCallback = std::function<void(const msg::IsobusTpTxStatus &)>;
 
     TransportProtocol(const Params & params,
                       SendCallback send_cb,
                       PublishTpCallback publish_cb,
+                      PublishTpTxStatusCallback publish_tx_status_cb,
                       rclcpp::Logger logger,
                       rclcpp::Clock::SharedPtr clock);
 
@@ -162,6 +165,7 @@ private:
     void sendRts(const TxSession & session);
     void continueRtsCts(TxSession & session, std::uint32_t allowed, std::uint32_t next_seq);
     void finishTxSession(const TxKey & key);
+    void publishTxStatus(const TxSession & session, std::uint8_t state);
 
     // Utilities.
     Protocol detectProtoForPayload(std::size_t len) const;
@@ -170,6 +174,7 @@ private:
     Params params_;
     SendCallback send_cb_;
     PublishTpCallback publish_cb_;
+    PublishTpTxStatusCallback publish_tx_status_cb_;
     rclcpp::Logger logger_;
     rclcpp::Clock::SharedPtr clock_;
 

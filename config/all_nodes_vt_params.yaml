@@ -1,0 +1,104 @@
+can_bridge_node:
+  ros__parameters:
+    interface: can0
+    disable_loopback: false
+    enable_tp: true
+    enable_etp: true
+    tp_strict_cts_timing: false
+    tp_rx_timeout_ms: 1000
+    tp_tx_timeout_ms: 1000
+    tp_tx_window_size_default: 8
+    tp_local_sa: 255
+
+address_manager_node:
+  ros__parameters:
+    ecu_name_hex: "01006007008202A0"
+    preferred_address: 131
+
+diagnostics_node:
+  ros__parameters:
+    source_address: 254
+    priority: 6
+    respond_to_requests: true
+    nack_unsupported_request: true
+    use_address_manager_sa: true
+
+    periodic_dm1_enabled: true
+    dm1_period_ms: 1000
+    dm3_clear_dm2: true
+    dm1_byte1: 255
+    dm1_byte2: 255
+    dm2_byte1: 255
+    dm2_byte2: 255
+
+    ecu_part_number: "ECU-PN-UNSET"
+    ecu_serial_number: "ECU-SN-UNSET"
+    ecu_location: "UNSET"
+    ecu_type: "UNSET"
+    ecu_manufacturer_name: "UNSET"
+    ecu_hardware_id: "UNSET"
+    software_ident_fields: ["ROS2ISOBUS#Diagnostics#1.0"]
+    diagnostic_protocol_id: 0
+
+    compliance_test_lab_id: 507
+    compliance_cert_year: 2017
+    compliance_cert_revision: 1
+    compliance_lab_type: 1
+    compliance_reference_number: 4660
+    compliance_message_revision: 1
+    compliance_type_byte4: 0
+    compliance_type_byte5: 0
+
+    cf_functionality_ids: [0]
+    cf_functionality_generations: [1]
+    cf_functionality_options: [""]
+
+    product_ident_code: "UNSET-CODE"
+    product_ident_brand: "UNSET-BRAND"
+    product_ident_model: "UNSET-MODEL"
+
+vt_client_node:
+  ros__parameters:
+    # Path to PoolEdit XML. Required for VT object pool generation.
+    # Can be absolute or package-share relative (resolved under share/ros2_isobus).
+    xml_file: "config/vt_examples/test.xml"
+
+    # Local and target VT source addresses.
+    # - sa_local is only startup value; AddressManager status updates it at runtime.
+    # - sa_vt is fallback value; VT SA is preferably detected from AddressBook NAME function 29.
+    sa_local: 131
+    sa_vt: 38
+    # If true, start VT session only after VT is identified from AddressBook/NAME
+    # (Address Claim path). If false, VT Status SA hint can start session earlier.
+    vt_wait_address_claim: true
+
+    # Fallback display profile used for XML->POOL scaling when VT response does not
+    # include usable profile extension fields.
+    vt_dimension: 200
+    vt_softkey_width: 60
+    vt_softkey_height: 32
+    vt_colors: 256
+    # If true, try to use VT-reported profile (when present/valid) before fallback values.
+    vt_use_reported_display_profile: true
+    # Optional preferred AUX assignment persistence file.
+    # Format per line: <aux_input_name_hex> <aux_input_object_id_hex> <aux_function_object_id_hex>
+    # If override is true, incoming AUX assignments are persisted even when
+    # VT marks "do not store as preferred".
+    vt_aux_preferred_store_override: false
+    vt_aux_preferred_assignment_file: ""
+
+    # IDs used as fallback when XML object IDs are missing/empty.
+    # Must be non-zero valid object IDs.
+    vt_working_set_id: 1
+    vt_object_pool_id: 1000
+    # ISO 11783-6 G.3 Working Set Maintenance byte3: WS VT version level.
+    vt_working_set_version: 3
+    # Optional ISO 11783-7 Working Set Member NAMEs are currently disabled.
+
+    # Session state machine timing.
+    vt_session_timeout_ms: 20000
+    vt_session_retries: 3
+    # Optional interoperability delay between object pool transfer (fn17)
+    # and End of Object Pool (fn18). Standard does not require delay; use
+    # only for VT-specific compatibility testing.
+    vt_session_tick_ms: 100

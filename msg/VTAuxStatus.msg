@@ -1,0 +1,7 @@
+bool enabled
+bool learn_mode_active
+bool last_input_locked
+bool last_input_interaction_detected
+uint16 last_function_object_id
+string last_token
+string detail

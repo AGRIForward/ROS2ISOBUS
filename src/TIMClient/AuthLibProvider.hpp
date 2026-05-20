@@ -48,6 +48,7 @@ public:
     std::uint8_t implemented_version,
     std::uint8_t minimum_version,
     bool strict_mode,
+    bool strict_timing,
     bool debug_auth_payloads,
     std::uint16_t client_cert_payload_max_len,
     std::uint16_t max_slice_iterations,
@@ -119,6 +120,7 @@ private:
   std::uint8_t retries_{0};
   Step step_{Step::WaitRandomTrigger};
   bool strict_mode_{true};
+  bool strict_timing_{false};
   bool debug_auth_payloads_{false};
   std::uint16_t client_cert_payload_max_len_{0U};
   std::uint16_t max_slice_iterations_{64U};
@@ -143,6 +145,7 @@ private:
   bool certs_valid_{false};
   bool challenge_signed_local_{false};
   bool challenge_signed_server_{false};
+  bool server_challenge_signed_status_seen_{false};
   bool server_authenticated_seen_{false};
   bool client_authenticated_status_sent_{false};
   bool pending_f8_request_{false};
@@ -150,6 +153,8 @@ private:
   std::uint32_t last_status_tx_ms_{0};
   std::uint32_t last_round_tx_ms_{0};
   std::uint32_t step_deadline_ms_{0};
+  bool last_auth_status_snapshot_valid_{false};
+  std::array<std::uint8_t, 4> last_auth_status_snapshot_{{0U, 0U, 0U, 0U}};
 
   std::string root_cert_path_;
   std::array<std::string, 4> client_cert_paths_{};

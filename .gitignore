@@ -13,3 +13,12 @@ third_party/AuthLib/cert/*
 
 # CryptoLib is local vendor dependency and must not be committed.
 third_party/CryptoLib/
+
+# ROS 2 / colcon build artifacts
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.pyc

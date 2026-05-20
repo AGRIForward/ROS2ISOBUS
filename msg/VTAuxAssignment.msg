@@ -1,0 +1,7 @@
+string token
+uint8 type_id
+bool assigned
+uint64 aux_input_name
+uint16 aux_input_object_id
+uint16 function_object_id
+bool store_as_preferred_assignment

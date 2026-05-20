@@ -58,24 +58,35 @@ enum class ShortMsgKind : std::uint8_t
   FinalizeTrigger
 };
 
+enum class ShortByte2Role : std::uint8_t
+{
+  ErrorCode,
+  Reserved
+};
+
 struct ShortMsgSpec
 {
   std::uint8_t msg_code;
   ShortMsgKind kind;
-  bool require_zero_error;
+  ShortByte2Role byte2_role;
   bool has_round;
 };
 
-constexpr std::array<ShortMsgSpec, 7> kShortMsgSpecs{{
-  {MSG_AUTH_SERVER_STATUS, ShortMsgKind::ServerStatus, false, false},
-  {kMsgAuthServerVersion, ShortMsgKind::ServerVersion, true, false},
-  {kMsgAuthServerRnd, ShortMsgKind::RandomTrigger, true, false},
-  // Interop: some stacks use 0x05 for client-random trigger short frame.
-  {kMsgAuthClientRnd, ShortMsgKind::RandomTrigger, true, false},
-  {kMsgAuthServerCert, ShortMsgKind::CertTrigger, true, true},
-  // Interop: some stacks use 0x03 for client-certificate trigger short frame.
-  {kMsgAuthClientCert, ShortMsgKind::CertTrigger, true, true},
-  {kMsgAuthServerFinalize, ShortMsgKind::FinalizeTrigger, true, true}
+constexpr std::array<ShortMsgSpec, 8> kShortMsgSpecs{{
+  {MSG_AUTH_SERVER_STATUS, ShortMsgKind::ServerStatus, ShortByte2Role::ErrorCode, false},
+  {kMsgAuthServerVersion, ShortMsgKind::ServerVersion, ShortByte2Role::Reserved, false},
+  // AEF 040 AUTH12 response code; retained as interop short-frame trigger.
+  {kMsgAuthServerRnd, ShortMsgKind::RandomTrigger, ShortByte2Role::ErrorCode, false},
+  // AEF 040 A.3.10 Auth_ClientRandomChallengeRequest.
+  {kMsgAuthClientRnd, ShortMsgKind::RandomTrigger, ShortByte2Role::Reserved, false},
+  // AEF 040 AUTH12 response code; retained as interop short-frame trigger.
+  {kMsgAuthServerCert, ShortMsgKind::CertTrigger, ShortByte2Role::ErrorCode, true},
+  // AEF 040 A.3.6 Auth_ClientCertificateRequest.
+  {kMsgAuthClientCert, ShortMsgKind::CertTrigger, ShortByte2Role::Reserved, true},
+  // AEF 040 AUTH12 response code; retained as interop short-frame trigger.
+  {kMsgAuthServerFinalize, ShortMsgKind::FinalizeTrigger, ShortByte2Role::ErrorCode, true},
+  // AEF 040 A.3.14 Auth_ClientSignedChallengeRequest.
+  {kMsgAuthClientFinalize, ShortMsgKind::FinalizeTrigger, ShortByte2Role::Reserved, false}
 }};
 
 enum class TpMsgKind : std::uint8_t
@@ -307,6 +318,7 @@ AuthLibProvider::AuthLibProvider(
   std::uint8_t implemented_version,
   std::uint8_t minimum_version,
   bool strict_mode,
+  bool strict_timing,
   bool debug_auth_payloads,
   std::uint16_t client_cert_payload_max_len,
   std::uint16_t max_slice_iterations,
@@ -319,6 +331,7 @@ AuthLibProvider::AuthLibProvider(
   implemented_version_(implemented_version),
   minimum_version_(minimum_version),
   strict_mode_(strict_mode),
+  strict_timing_(strict_timing),
   debug_auth_payloads_(debug_auth_payloads),
   client_cert_payload_max_len_(client_cert_payload_max_len),
   max_slice_iterations_(std::max<std::uint16_t>(1U, max_slice_iterations)),
@@ -663,12 +676,15 @@ void AuthLibProvider::reset(std::uint8_t client_sa, std::uint8_t server_sa)
   certs_valid_ = false;
   challenge_signed_local_ = false;
   challenge_signed_server_ = false;
+  server_challenge_signed_status_seen_ = false;
   server_authenticated_seen_ = false;
   client_authenticated_status_sent_ = false;
   pending_f8_request_ = false;
   last_status_tx_ms_ = 0;
   last_round_tx_ms_ = 0;
   step_deadline_ms_ = 0;
+  last_auth_status_snapshot_valid_ = false;
+  last_auth_status_snapshot_.fill(0U);
   auth_connection_version_ = minimum_version_;
   if (!failed_) {
     const char seed[] = "ros2_isobus_authlib_seed";
@@ -713,7 +729,7 @@ ros2_isobus::msg::IsobusFrame AuthLibProvider::make_client_version_response_fram
 ros2_isobus::msg::IsobusFrame AuthLibProvider::make_random_trigger_response_frame() const
 {
   auto fr = make_auth_frame(kMsgAuthServerRnd);
-  fr.data[1] = 0x00;
+  fr.data[1] = 0xFF;
   fr.data[2] = auth_type_field_;
   fr.data[3] = 0xFF;
   fr.data[4] = 0xFF;
@@ -726,7 +742,7 @@ ros2_isobus::msg::IsobusFrame AuthLibProvider::make_random_trigger_response_fram
 ros2_isobus::msg::IsobusFrame AuthLibProvider::make_cert_trigger_response_frame(std::uint8_t round) const
 {
   auto fr = make_auth_frame(kMsgAuthServerCert);
-  fr.data[1] = 0x00;
+  fr.data[1] = 0xFF;
   fr.data[2] = auth_type_field_;
   fr.data[3] = 0x00;
   fr.data[4] = round;
@@ -738,11 +754,12 @@ ros2_isobus::msg::IsobusFrame AuthLibProvider::make_cert_trigger_response_frame(
 
 ros2_isobus::msg::IsobusFrame AuthLibProvider::make_finalize_trigger_response_frame(std::uint8_t round) const
 {
+  (void)round;
   auto fr = make_auth_frame(kMsgAuthServerFinalize);
-  fr.data[1] = 0x00;
+  fr.data[1] = 0xFF;
   fr.data[2] = auth_type_field_;
   fr.data[3] = 0xFF;
-  fr.data[4] = round;
+  fr.data[4] = 0xFF;
   fr.data[5] = 0xFF;
   fr.data[6] = 0xFF;
   fr.data[7] = 0xFF;
@@ -825,10 +842,7 @@ ros2_isobus::msg::IsobusTpFrame AuthLibProvider::make_client_finalize_response_t
 
 void AuthLibProvider::send_auth_status(std::uint32_t now_ms, bool restart_bit)
 {
-  // Periodic client status frame (AEF 040 status signaling), including restart handshake hint.
-  if ((now_ms - last_status_tx_ms_) < period_ms_) return;
-  last_status_tx_ms_ = now_ms;
-
+  // Client auth status signaling.
   auto fr = make_auth_frame(MSG_AUTH_CLIENT_STATUS);
   fr.data[1] = 0x00;  // no error
   fr.data[2] = static_cast<std::uint8_t>((0x0U << 4) | (authenticated_ ? 0x1U : 0x0U));
@@ -845,6 +859,25 @@ void AuthLibProvider::send_auth_status(std::uint32_t now_ms, bool restart_bit)
   fr.data[3] = sub_status;  // auth sub-status / (Re)Start during initialization
   fr.data[6] = implemented_version_;
   fr.data[7] = minimum_version_;
+
+  if (strict_timing_) {
+    // Guideline timing: only during authentication process; 1000 ms periodic,
+    // 100 ms when status content changes.
+    if (authenticated_ || failed_) return;
+    const std::array<std::uint8_t, 4> snapshot{{fr.data[2], fr.data[3], fr.data[6], fr.data[7]}};
+    const bool changed = !last_auth_status_snapshot_valid_ || (snapshot != last_auth_status_snapshot_);
+    const bool periodic_due = !last_status_tx_ms_ || ((now_ms - last_status_tx_ms_) >= 1000U);
+    const bool change_due = changed && (!last_status_tx_ms_ || ((now_ms - last_status_tx_ms_) >= 100U));
+    if (!periodic_due && !change_due) return;
+    last_auth_status_snapshot_ = snapshot;
+    last_auth_status_snapshot_valid_ = true;
+    last_status_tx_ms_ = now_ms;
+  } else {
+    // Existing behavior (interop mode): periodic at configured period.
+    if ((now_ms - last_status_tx_ms_) < period_ms_) return;
+    last_status_tx_ms_ = now_ms;
+  }
+
   sendFrame(fr);
   if (restart_bit) {
     logInfo("TIM auth: sent client auth status with restart request");
@@ -1045,6 +1078,20 @@ void AuthLibProvider::send_round_requests(std::uint32_t now_ms)
       }
       last_status_tx_ms_ = 0;
     }
+    if (server_challenge_signed_status_seen_ && !finalize_request_sent_) {
+      const auto finalize_fr = make_finalize_trigger_response_frame(requested_finalize_round_);
+      if (debug_auth_payloads_) {
+        logInfo(
+          "TIM auth debug: tx server signed-challenge request msg=0x" +
+          to_hex(&finalize_fr.data[0], 1U) +
+          " reserved2=" + std::to_string(static_cast<unsigned>(finalize_fr.data[1])) +
+          " auth=0x" + to_hex(&finalize_fr.data[2], 1U));
+      }
+      sendFrame(finalize_fr);
+      expected_server_finalize_round_ = requested_finalize_round_;
+      finalize_request_sent_ = true;
+      step_deadline_ms_ = now_ms + kStepTimeoutMs;
+    }
     if (pending_server_finalize_request_) {
       // Server explicitly requested signed challenge; respond immediately.
       logInfo("TIM auth: server requested signed challenge, sending response payload");
@@ -1064,6 +1111,10 @@ void AuthLibProvider::send_round_requests(std::uint32_t now_ms)
       pending_server_finalize_request_ = false;
       step_ = Step::WaitFinalizeTp;
       step_deadline_ms_ = now_ms + kStepTimeoutMs;
+      return;
+    }
+    if (strict_timing_) {
+      // Strict guideline sequencing: wait for explicit server finalize/signed-challenge request.
       return;
     }
     if (!finalize_request_sent_) {
@@ -1087,6 +1138,20 @@ void AuthLibProvider::send_round_requests(std::uint32_t now_ms)
   }
 
   if (step_ == Step::WaitFinalizeTp) {
+    if (server_challenge_signed_status_seen_ && !finalize_request_sent_) {
+      const auto finalize_fr = make_finalize_trigger_response_frame(requested_finalize_round_);
+      if (debug_auth_payloads_) {
+        logInfo(
+          "TIM auth debug: tx server signed-challenge request msg=0x" +
+          to_hex(&finalize_fr.data[0], 1U) +
+          " reserved2=" + std::to_string(static_cast<unsigned>(finalize_fr.data[1])) +
+          " auth=0x" + to_hex(&finalize_fr.data[2], 1U));
+      }
+      sendFrame(finalize_fr);
+      expected_server_finalize_round_ = requested_finalize_round_;
+      finalize_request_sent_ = true;
+      step_deadline_ms_ = now_ms + kStepTimeoutMs;
+    }
     if (got_server_tp_06_) {
       got_server_tp_06_ = false;
       expected_server_finalize_round_ = 0;
@@ -1157,13 +1222,14 @@ void AuthLibProvider::on_frame(const ros2_isobus::msg::IsobusFrame & fr)
   if (debug_auth_payloads_) {
     logInfo(
       "TIM auth debug: rx short msg=0x" + to_hex(&msg, 1U) +
-      " err=" + std::to_string(static_cast<unsigned>(fr.data[1])) +
+      (spec->byte2_role == ShortByte2Role::ErrorCode ? " err=" : " reserved2=") +
+      std::to_string(static_cast<unsigned>(fr.data[1])) +
       " auth=0x" + to_hex(&fr.data[2], 1U) +
       " round_raw=" + std::to_string(static_cast<unsigned>(fr.data[4])) +
       " step=" + std::to_string(static_cast<unsigned>(step_)));
   }
 
-  if (spec->require_zero_error && fr.data[1] != 0x00U) {
+  if (spec->byte2_role == ShortByte2Role::ErrorCode && fr.data[1] != 0x00U) {
     if (protocol_violation(
         "auth short frame code=0x" + to_hex(&msg, 1U) +
         " carries non-zero error code " + std::to_string(static_cast<unsigned>(fr.data[1])))) return;
@@ -1211,8 +1277,8 @@ void AuthLibProvider::on_frame(const ros2_isobus::msg::IsobusFrame & fr)
       return;
     }
     const bool server_claims_signed = ((fr.data[3] & 0x02U) != 0U) || (fr.data[3] == 0x3EU);
-    if (server_claims_signed && server_signed_valid_) {
-      challenge_signed_server_ = true;
+    if (server_claims_signed) {
+      server_challenge_signed_status_seen_ = true;
     }
     if (auth_status == kAuthStatusAuthenticated) {
       server_authenticated_seen_ = true;
@@ -1273,12 +1339,14 @@ void AuthLibProvider::on_frame(const ros2_isobus::msg::IsobusFrame & fr)
           std::to_string(static_cast<unsigned>(step_)))) return;
       return;
     }
-    if (!strict_mode_ && fr.data[4] == 0xFFU) {
-      logWarn(
-        "TIM auth interop: finalize trigger used wildcard round 0xFF, "
-        "mapping to round " + std::to_string(static_cast<unsigned>(requested_finalize_round_)));
-    } else {
-      requested_finalize_round_ = fr.data[4];
+    if (spec->has_round) {
+      if (!strict_mode_ && fr.data[4] == 0xFFU) {
+        logWarn(
+          "TIM auth interop: finalize trigger used wildcard round 0xFF, "
+          "mapping to round " + std::to_string(static_cast<unsigned>(requested_finalize_round_)));
+      } else {
+        requested_finalize_round_ = fr.data[4];
+      }
     }
     pending_server_finalize_request_ = true;
     logInfo("TIM auth: received server finalize request trigger");
@@ -1412,7 +1480,7 @@ void AuthLibProvider::on_tp_payload(std::uint32_t pgn, const std::vector<std::ui
         to_hex(server_signed_challenge_.data(), server_signed_challenge_.size()));
     }
     logInfo("TIM auth: received TP server finalize payload");
-    if (!pending_server_finalize_request_ && step_ == Step::WaitFinalizeTrigger) {
+    if (!strict_timing_ && !pending_server_finalize_request_ && step_ == Step::WaitFinalizeTrigger) {
       // Interop: some servers send finalize TP payload before short finalize trigger.
       pending_server_finalize_request_ = true;
       logInfo("TIM auth interop: inferred finalize request from TP payload");

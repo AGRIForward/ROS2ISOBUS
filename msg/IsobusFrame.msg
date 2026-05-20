@@ -7,4 +7,5 @@ uint32 pgn              # Parameter Group Number
 uint8 sa                # Source address (SA)
 uint8 pf                # Protocol format (PF)
 uint8 ps                # Protocol specific (PS)
+uint8 dlc               # CAN DLC (0..8), defaults to 8 when not set by sender
 uint8[8] data           # 8-byte CAN payload

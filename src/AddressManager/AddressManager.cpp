@@ -57,6 +57,7 @@ msg::IsobusFrame AddressManager::addressClaim() const
   imsg.page = 0;
   imsg.priority = 6;
   imsg.sa = address_;
+  imsg.dlc = 8;
   imsg.data = isobusName_;
   return imsg;
 }
@@ -69,6 +70,7 @@ msg::IsobusFrame AddressManager::requestPGN(std::uint16_t PGN) const
   imsg.page = 0;
   imsg.priority = 3;
   imsg.sa = address_;
+  imsg.dlc = 3;
   imsg.data[0] = PGN & 0xFF;
   imsg.data[1] = (PGN >> 8) & 0xFF;
   imsg.data[2] = (PGN >> 16) & 0xFF;

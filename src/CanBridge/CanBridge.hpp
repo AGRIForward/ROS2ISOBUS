@@ -34,6 +34,7 @@
 #include "ros2_isobus/msg/isobus_address_status.hpp"
 #include "ros2_isobus/msg/isobus_frame.hpp"
 #include "ros2_isobus/msg/isobus_tp_frame.hpp"
+#include "ros2_isobus/msg/isobus_tp_tx_status.hpp"
 #include "TransportProtocol.hpp"
 
 namespace ros2_isobus
@@ -69,6 +70,7 @@ private:
 
     rclcpp::Publisher<msg::IsobusFrame>::SharedPtr rxPublisher_;
     rclcpp::Publisher<msg::IsobusTpFrame>::SharedPtr rxTpPublisher_;
+    rclcpp::Publisher<msg::IsobusTpTxStatus>::SharedPtr tpTxStatusPublisher_;
     rclcpp::Subscription<msg::IsobusFrame>::SharedPtr txSubscriber_;
     rclcpp::Subscription<msg::IsobusTpFrame>::SharedPtr txTpSubscriber_;
     rclcpp::Subscription<msg::IsobusAddressStatus>::SharedPtr addressStatusSubscriber_;

@@ -1,0 +1,13 @@
+uint8 active_ws_sa
+uint16 visible_data_alarm_mask_id
+uint16 visible_soft_key_mask_id
+uint8 busy_codes
+uint8 current_command_function
+bool busy_updating_visible_mask
+bool busy_saving_to_nonvolatile
+bool busy_executing_command
+bool busy_executing_macro
+bool parsing_active
+bool aux_learn_mode_active
+bool out_of_memory
+bool status_timeout

@@ -76,4 +76,5 @@ constexpr char kBusRxTopic[] = "ISOBUS/bus_rx_frames";
 constexpr char kBusTxTopic[] = "ISOBUS/bus_tx_frames";
 constexpr char kBusRxTpTopic[] = "ISOBUS/bus_rx_tp_frames";
 constexpr char kBusTxTpTopic[] = "ISOBUS/bus_tx_tp_frames";
+constexpr char kBusTxTpStatusTopic[] = "ISOBUS/bus_tp_tx_status";
 }  // namespace ros2_isobus

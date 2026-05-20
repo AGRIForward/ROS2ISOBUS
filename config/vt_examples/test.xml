@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<objectpool dimension="200" fix_bitmap_path="images\" sk_height="32" sk_width="60" std_bitmap_path="images\">
+  <workingset background_colour="white" id="256" name="workingset" selectable="yes" use="designator">
+    <include_object id="257" name="datamask" role="active_mask"/>
+    <outputstring background_colour="black" height="5" horizontal_justification="left" id="262" language="" length="2" name="label1" options="transparent" pos_x="0" pos_y="0" use="mask" value="OK" width="20">
+      <include_object id="260" name="black6x8" role="font_attributes"/>
+    </outputstring>  </workingset>
+  <datamask background_colour="white" id="257" name="datamask" role="" use="mask">
+    <include_object id="259" name="softkeymask" role="soft_key_mask"/>
+    <outputstring background_colour="black" height="20" horizontal_justification="left" id="258" language="" length="7" name="label0" options="transparent" pos_x="75" pos_y="83" use="mask" value="Testing" width="61">
+      <include_object id="260" name="black6x8" role="font_attributes"/>
+    </outputstring>
+  </datamask>
+  <softkeymask background_colour="white" id="259" name="softkeymask" role="" use="designator">
+      <key background_colour="grey" id="271" key_code="1" name="softkey0" use="designator">
+      <outputstring background_colour="black" height="8" horizontal_justification="left" id="274" language="" length="4" name="label1" options="transparent" pos_x="4" pos_y="13" use="mask" value="KEY1" width="24">
+        <include_object id="260" name="black6x8" role="font_attributes"/>
+      </outputstring>
+    </key>
+  </softkeymask>
+  <fontattributes font_colour="black" font_size="6x8" font_style="normal" font_type="latin1" id="260" language="" name="black6x8" role="" use="mask"/>
+  <lineattributes id="261" line_art="1111111111111111" line_colour="black" line_width="1" name="lineattributes" role=""/>
+</objectpool>

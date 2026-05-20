@@ -6,7 +6,9 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(EXPAT REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -87,6 +89,26 @@ set_target_properties(tim_client_node PROPERTIES
   BUILD_RPATH "${AUTHLIB_ROOT}/lib"
   INSTALL_RPATH "$ORIGIN/..")
 
+add_executable(vt_client_node
+  src/VTClient/VTClientNode.cpp
+  src/VTClient/VTClient.cpp
+  src/VTClient/VTProtocolCodec.cpp
+  src/VTClient/VTPoolModel.cpp
+  src/VTClient/pooledit_parser/parser.cpp
+  src/VTClient/pooledit_parser/xml.cpp)
+target_include_directories(vt_client_node PRIVATE
+  include
+  src/VTClient
+  src/VTClient/pooledit_parser
+  ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+ament_target_dependencies(vt_client_node
+  ament_index_cpp
+  diagnostic_msgs
+  rclcpp
+  std_msgs
+  rosidl_default_runtime)
+target_link_libraries(vt_client_node EXPAT::EXPAT)
+
 install(TARGETS
   address_manager_node
   nmea2000_node
@@ -95,6 +117,7 @@ install(TARGETS
   can_bridge_node
   diagnostics_node
   tim_client_node
+  vt_client_node
   DESTINATION lib/${PROJECT_NAME})
 
 install(FILES
@@ -112,17 +135,37 @@ install(DIRECTORY launch/
 
 install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
-  FILES_MATCHING PATTERN "*.yaml")
+)
 
 install(DIRECTORY third_party/AuthLib/cert/
   DESTINATION share/${PROJECT_NAME}/third_party/AuthLib/cert)
 
+# rosidl_generate_interfaces() already installs Python package `${PROJECT_NAME}`.
+# Install VT helper modules into that same generated package to avoid duplicate
+# ament_cmake_python target names.
+ament_get_python_install_dir(python_install_dir)
+install(
+  FILES
+    scripts/ros2_isobus/vt_client_interface.py
+    scripts/ros2_isobus/__init__.py
+  DESTINATION ${python_install_dir}/ros2_isobus)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/IsobusFrame.msg"
   "msg/IsobusTpFrame.msg"
+  "msg/IsobusTpTxStatus.msg"
   "msg/IsobusAddressStatus.msg"
   "msg/IsobusAddressEntry.msg"
   "msg/IsobusAddressBook.msg"
+  "msg/VTStatus.msg"
+  "msg/CommandResult.msg"
+  "msg/VTSessionState.msg"
+  "msg/VTPointingEvent.msg"
+  "msg/VTNavigationEvent.msg"
+  "msg/VTUpdateResult.msg"
+  "msg/VTAuxInputRaw.msg"
+  "msg/VTAuxAssignment.msg"
+  "msg/VTAuxStatus.msg"
   "msg/TecuWheelSpeed.msg"
   "msg/TecuGroundSpeed.msg"
   "msg/TecuRearHitchStatus.msg"
@@ -158,7 +201,9 @@ target_link_libraries(tecu_node "${cpp_typesupport_target}")
 target_link_libraries(test_panel_node "${cpp_typesupport_target}")
 target_link_libraries(diagnostics_node "${cpp_typesupport_target}")
 target_link_libraries(tim_client_node "${cpp_typesupport_target}")
+target_link_libraries(vt_client_node "${cpp_typesupport_target}")
 
 ament_export_dependencies(rosidl_default_runtime)
+ament_export_include_directories(include)
 
 ament_package()

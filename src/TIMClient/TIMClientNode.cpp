@@ -26,6 +26,7 @@
 #include <array>
 #include <cctype>
 #include <exception>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,33 @@ std::string to_hex(const std::array<std::uint8_t, 8> & arr)
         out.push_back(kHex[byte & 0x0F]);
     }
     return out;
+}
+
+std::string resolve_package_path(const std::string & path, const std::string & package_share_dir)
+{
+    if (path.empty()) return path;
+    const std::filesystem::path input(path);
+    if (input.is_absolute()) return path;
+
+    if (!package_share_dir.empty()) {
+        const auto package_path = std::filesystem::path(package_share_dir) / input;
+        if (std::filesystem::exists(package_path)) {
+            return package_path.string();
+        }
+    }
+
+    if (std::filesystem::exists(input)) {
+        return input.string();
+    }
+
+    if (input.native().rfind("third_party/", 0) == 0) {
+        const auto source_path = std::filesystem::path("src/Ros2ISOBUS") / input;
+        if (std::filesystem::exists(source_path)) {
+            return source_path.string();
+        }
+    }
+
+    return path;
 }
 
 }  // namespace
@@ -153,6 +181,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
     const auto authlib_minimum_version = static_cast<std::uint8_t>(
         declare_parameter<int>("authlib.minimum_version", 2));
     const bool authlib_strict = declare_parameter<bool>("authlib.strict", false);
+    const bool authlib_strict_timing = declare_parameter<bool>("authlib.strict_timing", false);
     const bool authlib_debug_auth_payloads =
         declare_parameter<bool>("authlib.debug_auth_payloads", false);
     // Maximum bytes sent in client certificate TP payload:
@@ -166,31 +195,32 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
         declare_parameter<int>("authlib.max_slice_iterations", 1024);
     const auto authlib_max_slice_iterations = static_cast<std::uint16_t>(
         std::max<int>(1, authlib_max_slice_iterations_param));
+    std::string package_share_dir;
     std::string authlib_cert_base = "third_party/AuthLib/cert";
     try {
-        authlib_cert_base =
-            ament_index_cpp::get_package_share_directory("ros2_isobus") + "/third_party/AuthLib/cert";
+        package_share_dir = ament_index_cpp::get_package_share_directory("ros2_isobus");
+        authlib_cert_base = package_share_dir + "/third_party/AuthLib/cert";
     } catch (const std::exception &) {
         // Keep relative fallback when package share path is unavailable.
     }
-    const std::string authlib_root_cert_path = declare_parameter<std::string>(
-        "authlib.root_cert_path",
-        authlib_cert_base + "/root_ca.der");
-    const std::string authlib_client_testlab_cert_path = declare_parameter<std::string>(
-        "authlib.client_testlab_cert_path",
-        authlib_cert_base + "/aef_testlab.der");
-    const std::string authlib_client_manufacturer_cert_path = declare_parameter<std::string>(
-        "authlib.client_manufacturer_cert_path",
-        authlib_cert_base + "/manu1.der");
-    const std::string authlib_client_series_cert_path = declare_parameter<std::string>(
-        "authlib.client_series_cert_path",
-        authlib_cert_base + "/manu1_series.der");
-    const std::string authlib_client_device_cert_path = declare_parameter<std::string>(
-        "authlib.client_device_cert_path",
-        authlib_cert_base + "/manu1_peer1.der");
-    const std::string authlib_client_private_key_hex = declare_parameter<std::string>(
-        "authlib.client_private_key_hex",
-        authlib_cert_base + "/manu1_peer1.key.hex");
+    const std::string authlib_root_cert_path = resolve_package_path(
+        declare_parameter<std::string>("authlib.root_cert_path", authlib_cert_base + "/root_ca.der"),
+        package_share_dir);
+    const std::string authlib_client_testlab_cert_path = resolve_package_path(
+        declare_parameter<std::string>("authlib.client_testlab_cert_path", authlib_cert_base + "/aef_testlab.der"),
+        package_share_dir);
+    const std::string authlib_client_manufacturer_cert_path = resolve_package_path(
+        declare_parameter<std::string>("authlib.client_manufacturer_cert_path", authlib_cert_base + "/manu1.der"),
+        package_share_dir);
+    const std::string authlib_client_series_cert_path = resolve_package_path(
+        declare_parameter<std::string>("authlib.client_series_cert_path", authlib_cert_base + "/manu1_series.der"),
+        package_share_dir);
+    const std::string authlib_client_device_cert_path = resolve_package_path(
+        declare_parameter<std::string>("authlib.client_device_cert_path", authlib_cert_base + "/manu1_peer1.der"),
+        package_share_dir);
+    const std::string authlib_client_private_key_hex = resolve_package_path(
+        declare_parameter<std::string>("authlib.client_private_key_hex", authlib_cert_base + "/manu1_peer1.key.hex"),
+        package_share_dir);
     const std::string authlib_server_public_key_hex = declare_parameter<std::string>(
         "authlib.server_public_key_hex",
         "");
@@ -216,6 +246,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
             authlib_implemented_version,
             authlib_minimum_version,
             authlib_strict,
+            authlib_strict_timing,
             authlib_debug_auth_payloads,
             authlib_client_cert_payload_max_len,
             authlib_max_slice_iterations,

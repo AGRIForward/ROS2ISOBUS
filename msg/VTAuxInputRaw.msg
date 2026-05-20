@@ -1,0 +1,12 @@
+string token
+uint8 type_id
+uint16 function_object_id
+uint16 input_object_id
+float64 normalized_value
+uint16 value1
+uint16 value2
+uint8 operating_state_bits
+bool learn_mode_active
+bool input_activated_in_learn_mode
+bool locked
+bool interaction_detected

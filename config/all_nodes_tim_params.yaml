@@ -1,7 +1,7 @@
 can_bridge_node:
   ros__parameters:
     interface: can0
-    disable_loopback: true
+    disable_loopback: false
     enable_tp: true
     enable_etp: true
     tp_strict_cts_timing: false
@@ -12,7 +12,8 @@ can_bridge_node:
 
 address_manager_node:
   ros__parameters:
-    ecu_name_hex: "01006007008203A0"
+    #ecu_name_hex: "01006007008203A0"
+    ecu_name_hex: "01006007008202A0"
     preferred_address: 28
 
 diagnostics_node:
@@ -79,6 +80,7 @@ tim_client_node:
     # Authentication mode: None | Dummy | AuthLib
     auth_mode: AuthLib
     authlib.strict: false
+    authlib.strict_timing: true
     authlib.debug_auth_payloads: true
     authlib.max_slice_iterations: 50000
     # Client certificate payload max bytes in TP response (0 = full DER, 26 = testbench interop).
@@ -100,7 +102,7 @@ tim_client_node:
     command_mode: direct
     # Function request timeout: if no new setpoint for this duration, function enable=false.
     command_timeout_ms: 250
-    implemented_version: 1
+    implemented_version: 2
     minimum_version: 1
     tim.enable_speed: true
     tim.enable_curvature: false
