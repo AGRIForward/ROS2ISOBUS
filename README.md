@@ -7,6 +7,7 @@ Experimental ROS 2 nodes that translate key parts of the ISO 11783 (ISOBUS) an
 
 Based on legacy ISOBUS research code used in earlier projects; ROS 2 adaptation and refactor were assisted by OpenAI Codex/ChatGPT.
 ISOBUS components have been used e.g. in the robot described in https://doi.org/10.1016/j.ifacol.2022.11.106.
+`TIMClient` and `VTClient` implementations in this repository are fully Codex-generated.
 
 
 - Authors: Juha Backman et al. (Luonnonvarakeskus / Natural Resources Institute Finland)  

@@ -2,6 +2,10 @@
 
 All notable public-facing changes to this project are documented in this file.
 
+## 2026-05-20
+- New node: `VTClient`.
+- Added VT client helper interfaces (C++ and Python).
+
 ## 2026-04-22
 - NMEA2000: rapid GNSS position (`publishRapidPosition`) now publishes to a dedicated topic `ISOBUS/nmea2000/gnss_position_data_rapid` (separate from `ISOBUS/nmea2000/gnss_position_data`).
 - TIM AuthLib: added parameterized auth payload debug logging (`authlib.debug_auth_payloads`) for troubleshooting.
