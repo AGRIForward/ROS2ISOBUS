@@ -45,12 +45,16 @@ Classes
     - `ISOBUS/vt/aux/<name_token>/input/value`
     - `ISOBUS/vt/aux/<name_token>/input/raw`
     - `ISOBUS/vt/aux/<name_token>/assignment/value|result`
+  - Accessors: `input_value()`, `input_value_raw()`, `input_raw()`, `assignment()`, `assignment_result()`.
+  - Callbacks: `on_input(...)`, `on_input_raw(...)`, `on_assignment(...)`, `on_assignment_result(...)`.
+  - Pass `value_type=bool`, `int` or `float` to select normalized-value conversion.
 - `VTWorkingSet`
   - Working-set level communication:
     - active/softkey mask triggers
     - status, session state
     - pointing/navigation events
     - diagnostics
+    - AUX status (`aux_status()`, `on_aux_status(...)`)
     - runtime pool updates (`send_pool_update_xml(...)`)
     - runtime pool update result callback (`on_updated(...)`)
 
@@ -110,3 +114,4 @@ Notes
 - Each object class instance is bound to one XML `name_token`.
 - This helper assumes `vt_client_node` is running and has created matching topics from loaded XML.
 - `VTWorkingSet.send_pool_update_xml(...)` can update one or many objects in one XML payload.
+- AUX-N wrappers require `vt_client_node` parameter `vt_aux_n_support:=true`; the wrapper token must match an `auxiliaryfunction` object's XML `name`.

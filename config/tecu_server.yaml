@@ -1,0 +1,21 @@
+address_manager_node:
+  ros__parameters:
+    ecu_name_hex: "01006007008600A0"
+    preferred_address: 240
+
+can_bridge_node:
+  ros__parameters:
+    interface: "can0"
+    disable_loopback: true
+
+tecu_server_node:
+  ros__parameters:
+    tecu_class: 3
+    enable_guidance: true
+    enable_cruise: true
+    enable_rear_hitch: true
+    enable_rear_pto: true
+    enable_lighting: true
+    enable_power_management: true
+    aux_valve_count: 8
+    input_timeout_ms: 1000

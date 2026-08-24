@@ -41,12 +41,18 @@ Classes
 - `ros2_isobus::VTSoftkey`
   - Event input via `ISOBUS/vt/event/softkey/<name_token>`.
   - Same callback API as `VTButton`.
+- `ros2_isobus::VTAuxFunction<TValue>`
+  - AUX-N function input and assignment streams under `ISOBUS/vt/aux/<name_token>`.
+  - `input/value` is converted from normalized `Float64` to `bool`, an integer type or a floating-point type selected by `TValue`.
+  - Accessors: `input_value()`, `input_value_raw()`, `input_raw()`, `assignment()`, `assignment_result()`.
+  - Callbacks: `on_input(...)`, `on_input_raw(...)`, `on_assignment(...)`, `on_assignment_result(...)`.
 - `ros2_isobus::VTWorkingSet`
   - Working-set level communication:
     - active/softkey mask set/value/result
     - status, session state
     - pointing/navigation events
     - diagnostics
+    - AUX status (`aux_status()`, `on_aux_status(...)`)
     - runtime pool updates (`send_pool_update_xml(...)`)
     - runtime pool update result callback (`on_updated(...)`)
   - Supports both:
@@ -136,6 +142,29 @@ private:
   ros2_isobus::VTInputBoolean in_bool_;
 };
 ```
+
+AUX-N Wrapper Example
+```cpp
+#include "ros2_isobus/vt_client_interface.hpp"
+
+class VtAuxDemo : public rclcpp::Node {
+public:
+  VtAuxDemo() : Node("vt_aux_demo"), aux_(*this, "aux_function") {
+    aux_.on_input([this](double value) {
+      RCLCPP_INFO(get_logger(), "AUX input=%.3f", value);
+    });
+    aux_.on_assignment([this](const ros2_isobus::msg::VTAuxAssignment & assignment) {
+      RCLCPP_INFO(get_logger(), "AUX assigned=%s", assignment.assigned ? "true" : "false");
+    });
+  }
+
+private:
+  ros2_isobus::VTAuxFunction<double> aux_;
+};
+```
+
+The VT node must run with `vt_aux_n_support:=true`, and `aux_function` must match an
+`auxiliaryfunction` object's XML `name`.
 
 Pool Update Example (`send_pool_update_xml`)
 ```cpp

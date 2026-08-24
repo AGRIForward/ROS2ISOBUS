@@ -9,8 +9,9 @@ Standards / PGNs (coverage)
 - GNSS Pseudo Noise Stats 129539 (0xFA06) → `diagnostic_msgs/DiagnosticArray`  
 - Position Rapid Update 129025 (0xF801) → `NavSatFix` rapid topic  
 - COG & SOG Rapid Update 129026 (0xF802) → `geometry_msgs/TwistStamped`  
+- COG & SOG → ENU `TwistWithCovarianceStamped` on `ISOBUS/nmea2000/velocity`
 - Attitude 127257 (0xF119) → `geometry_msgs/Vector3Stamped`  
-- Position Delta 129025 delta variant (0xF803) → updates rapid lat/lon  
+- Position Delta 129027 (0xF803) → updates GNSS latitude/longitude
 
 Limitations  
 - Assumes a single GNSS/NMEA2000 talker on the bus; frames are not filtered by source address (SA), so multiple GNSS devices would overwrite each other.
@@ -22,6 +23,8 @@ Topics
   - `ISOBUS/nmea2000/cog_sog` (`TwistStamped`)  
   - `ISOBUS/nmea2000/gnss_position_data_rapid` (`NavSatFix`)  
   - `ISOBUS/nmea2000/attitude` (`Vector3Stamped`)  
+  - `ISOBUS/nmea2000/imu` (`sensor_msgs/Imu`)
+  - `ISOBUS/nmea2000/velocity` (`geometry_msgs/TwistWithCovarianceStamped`)
 - Subscribes: `ISOBUS/bus_rx_frames` (`IsobusFrame`)
 
 Messages (custom/used)

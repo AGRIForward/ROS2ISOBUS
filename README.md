@@ -12,8 +12,19 @@ ISOBUS components have been used e.g. in the robot described in https://doi.org/
 
 - Authors: Juha Backman et al. (Luonnonvarakeskus / Natural Resources Institute Finland)  
 - Contact: juha.backman@luke.fi  
-- License: LGPL-3.0 (see LICENSE)
+- License: LGPL-3.0 (see LICENSE), except for separately licensed third-party components described below.
 - Change history: [CHANGELOG.md](CHANGELOG.md)
+
+Third-party licensing
+---------------------
+- The modified PoolEditParser sources embedded in `src/VTClient/pooledit_parser`
+  originate from [PoolEditParser](https://github.com/moehman/PoolEditParser) and
+  retain their GNU GPL version 3-or-later license notices. They are not covered
+  by the repository's LGPL-3.0-only declaration.
+- The optional AEF AuthLib and CryptoLib files are not included in version
+  control. When supplied locally and enabled in the build, they remain subject
+  to their own vendor licensing terms and are not covered by this repository's
+  LGPL license.
 
 Overview
 --------
@@ -21,9 +32,11 @@ Overview
 - **AddressManager** (ISO 11783‑5): address claim / request, maintains NAME/SA book. Docs: [src/AddressManager/README.md](src/AddressManager/README.md)
 - **Diagnostics** (ISO 11783‑12 Annex B minimum): ECU/SW/protocol identification, DM1/DM2/DM3, ISOBUS certification, functionalities, product identification. Docs: [src/Diagnostics/README.md](src/Diagnostics/README.md)
 - **TECU Class2/Class3 (legacy) Clients** (ISO 11783‑7/9): speed/hitch/PTO/guidance/cruise/AUX valve, custom ROS msgs. Docs: [src/TECUClient/README.md](src/TECUClient/README.md)
+- **TECU Server** (ISO 11783-7/9): configurable tractor-side Class 1, 2 or 3 server using AddressManager and CanBridge. Missing or stale tractor measurements are encoded as the standard `not available` values. Docs: [src/TECUServer/README.md](src/TECUServer/README.md)
 - **TIMClient** (AEF TIM): TIM handshake/state machine + TIM function command/status ROS interfaces. Docs: [src/TIMClient/README.md](src/TIMClient/README.md)
-- **NMEA2000Client** (NMEA 2000): parses GNSS/COG/SOG/Attitude PGNs to ROS standard messages. Docs: [src/NMEA2000Client/README.md](src/NMEA2000Client/README.md)
-- **VTClient** (ISO 11783‑6): Virtual Terminal session/state machine, object-pool transfer, VT event/value ROS interfaces. Docs: [src/VTClient/README.md](src/VTClient/README.md)
+- **NMEA2000Client** (NMEA 2000): decodes navigation PGNs into ROS measurement topics. Docs: [src/NMEA2000Client/README.md](src/NMEA2000Client/README.md)
+- **NMEA2000Server** (NMEA 2000): event-driven server that encodes ROS measurements into the corresponding navigation PGNs. Docs: [src/NMEA2000Server/README.md](src/NMEA2000Server/README.md)
+- **VTClient** (ISO 11783‑6): Virtual Terminal session management, PoolEdit object-pool transfer and runtime updates, ROS event/value interfaces, and AUX-N assignment and input-status routing. Docs: [src/VTClient/README.md](src/VTClient/README.md)
 - **TestPanel**: keyboard‑driven debug UI that subscribes to telemetry and can emit either TECU or TIM commands. Docs: [src/TestPanel/README.md](src/TestPanel/README.md)
 
 Dependencies
@@ -35,10 +48,28 @@ Dependencies
 
 Building
 --------
+By default, TIMClient is built with proprietary AuthLib support. This preserves
+the normal private-repository build and requires the untracked AuthLib and
+CryptoLib files under `third_party/AuthLib` and `third_party/CryptoLib`:
+
 ```bash
 colcon build --packages-select ros2_isobus
 source install/setup.bash
 ```
+
+To build the complete package without AuthLib, disable the provider at CMake
+configuration time:
+
+```bash
+colcon build --packages-select ros2_isobus --cmake-args \
+  -DROS2_ISOBUS_ENABLE_AUTHLIB=OFF
+source install/setup.bash
+```
+
+This still builds `tim_client_node` with `auth_mode=None` and `auth_mode=Dummy`
+support. Selecting `auth_mode=AuthLib` in an AuthLib-disabled build causes the
+node to stop with a clear configuration error. Reconfigure with
+`-DROS2_ISOBUS_ENABLE_AUTHLIB=ON` to restore AuthLib support.
 
 Launching / Running
 -------------------
@@ -76,6 +107,8 @@ ros2 run ros2_isobus diagnostics_node
 ros2 run ros2_isobus nmea2000_node
 ros2 run ros2_isobus vt_client_node
 ros2 run ros2_isobus tecu_node -- --class3 | --class2
+ros2 run ros2_isobus tecu_server_node --ros-args --params-file \
+  src/Ros2ISOBUS/config/tecu_server.yaml
 ros2 run ros2_isobus tim_client_node
 ```
 Test panel:
@@ -91,9 +124,12 @@ Key Parameters
 - AddressManager: `ecu_name_hex`, `preferred_address`.
 - Diagnostics: Annex B parameter groups (`ecu_*`, `software_ident_fields`, `diagnostic_protocol_id`, `active_dtc_*`, `previously_active_dtc_*`, `compliance_*`, `cf_functionality_*`, `product_ident_*`).
 - TECU Class3: `command_mode` (direct/periodic/both), `valve_count`.
+- TECU Server: `tecu_class` (1–3), installed-feature parameters,
+  `aux_valve_count` (0–16), and `input_timeout_ms`. Physical tractor values
+  are measurement topics rather than parameters.
 - TIMClient: `auth_mode` (`None`/`Dummy`/`AuthLib`), `tim.enable_*`, `tim.aux_*`, `command_mode` (direct/periodic/both).
-- NMEA2000: `frame_id` for published messages.
-- VTClient: `xml_file`, `sa_local`, `sa_vt`, `vt_session_timeout_ms`, `vt_session_retries`.
+- NMEA2000 Client: `frame_id` for published messages. Server: transmit `priority` (0–7).
+- VTClient: `xml_file`, `sa_local`, `sa_vt`, `vt_session_timeout_ms`, `vt_session_retries`, `vt_aux_n_support`, and AUX preferred-assignment options.
 - TestPanel: `control_interface` (`tecu`/`tim`).
 
 

@@ -19,7 +19,9 @@
  */
 
 #include "TIMClientNode.hpp"
+#ifdef ROS2_ISOBUS_HAS_AUTHLIB
 #include "AuthLibProvider.hpp"
+#endif
 #include "DummyAuthProvider.hpp"
 
 #include <algorithm>
@@ -27,6 +29,7 @@
 #include <cctype>
 #include <exception>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -49,6 +52,7 @@ std::string to_hex(const std::array<std::uint8_t, 8> & arr)
     return out;
 }
 
+#ifdef ROS2_ISOBUS_HAS_AUTHLIB
 std::string resolve_package_path(const std::string & path, const std::string & package_share_dir)
 {
     if (path.empty()) return path;
@@ -75,6 +79,7 @@ std::string resolve_package_path(const std::string & path, const std::string & p
 
     return path;
 }
+#endif
 
 }  // namespace
 
@@ -174,6 +179,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
         declare_parameter<int>("dummy_auth.implemented_version", 3));
     const auto dummy_auth_minimum_version = static_cast<std::uint8_t>(
         declare_parameter<int>("dummy_auth.minimum_version", 2));
+#ifdef ROS2_ISOBUS_HAS_AUTHLIB
     const auto authlib_period_ms = static_cast<std::uint32_t>(
         declare_parameter<int>("authlib.period_ms", 1000));
     const auto authlib_implemented_version = static_cast<std::uint8_t>(
@@ -224,6 +230,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
     const std::string authlib_server_public_key_hex = declare_parameter<std::string>(
         "authlib.server_public_key_hex",
         "");
+#endif
 
     if (auth_mode != "none" && auth_mode != "dummy" && auth_mode != "authlib") {
         RCLCPP_WARN(
@@ -240,6 +247,7 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
         provider->reset(client_sa(), server_sa());
         set_auth_provider(provider);
     } else if (auth_mode == "authlib") {
+#ifdef ROS2_ISOBUS_HAS_AUTHLIB
         auto provider = std::make_shared<AuthLibProvider>(
             *this,
             authlib_period_ms,
@@ -260,6 +268,14 @@ TIMClientROS2::TIMClientROS2(const rclcpp::NodeOptions & options)
             authlib_server_public_key_hex);
         provider->reset(client_sa(), server_sa());
         set_auth_provider(provider);
+#else
+        RCLCPP_ERROR(
+            get_logger(),
+            "auth_mode=AuthLib requested, but this build was configured with "
+            "ROS2_ISOBUS_ENABLE_AUTHLIB=OFF");
+        throw std::runtime_error(
+                  "auth_mode=AuthLib is unavailable in an AuthLib-disabled build");
+#endif
     }
 
     // process_period_ms is the ROS-side scheduler period for TimClient::process().

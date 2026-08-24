@@ -80,6 +80,8 @@ vt_client_node:
     vt_colors: 256
     # If true, try to use VT-reported profile (when present/valid) before fallback values.
     vt_use_reported_display_profile: true
+    # Enable AUX-N function assignment and input-status routing for auxiliaryfunction objects.
+    vt_aux_n_support: false
     # Optional preferred AUX assignment persistence file.
     # Format per line: <aux_input_name_hex> <aux_input_object_id_hex> <aux_function_object_id_hex>
     # If override is true, incoming AUX assignments are persisted even when

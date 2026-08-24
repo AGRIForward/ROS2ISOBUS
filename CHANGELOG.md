@@ -2,6 +2,11 @@
 
 All notable public-facing changes to this project are documented in this file.
 
+## 2026-08-24
+- New node: `NMEA2000Server`, providing event-driven ROS measurement to NMEA 2000 PGN encoding with fast-packet support for multi-frame PGNs.
+- Added standard ROS NMEA 2000 measurement interfaces for velocity and orientation (`TwistWithCovarianceStamped` and `sensor_msgs/Imu`).
+- New node: `TECUServer`, a configurable tractor-side Class 1, 2 or 3 server with measurement availability timeouts and Class 3 command interfaces.
+
 ## 2026-05-20
 - New node: `VTClient`.
 - Added VT client helper interfaces (C++ and Python).

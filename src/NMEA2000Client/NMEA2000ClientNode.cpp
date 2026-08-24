@@ -36,6 +36,8 @@ NMEA2000ClientROS2::NMEA2000ClientROS2(const rclcpp::NodeOptions &options)
     pseudo_noise_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(ros2_isobus::kNmea2000PseudoNoiseTopic, 10);
     cog_sog_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(ros2_isobus::kNmea2000CogSogTopic, 10);
     attitude_pub_ = create_publisher<geometry_msgs::msg::Vector3Stamped>(ros2_isobus::kNmea2000AttitudeTopic, 10);
+    imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(ros2_isobus::kNmea2000ImuTopic, 10);
+    velocity_pub_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(ros2_isobus::kNmea2000VelocityTopic, 10);
 
     bus_sub_ = create_subscription<ros2_isobus::msg::IsobusFrame>(
         ros2_isobus::kBusRxTopic, 100,
@@ -84,6 +86,14 @@ void NMEA2000ClientROS2::publishCogSog()
     if (cog_sog_pub_)
         cog_sog_pub_->publish(msg);
 
+    geometry_msgs::msg::TwistWithCovarianceStamped velocity;
+    velocity.header = msg.header;
+    const double yaw = -compass_rad + M_PI / 2.0;
+    velocity.twist.twist.linear.x = speed_ms * std::cos(yaw);
+    velocity.twist.twist.linear.y = speed_ms * std::sin(yaw);
+    if (velocity_pub_)
+        velocity_pub_->publish(velocity);
+
 }
 
 void NMEA2000ClientROS2::publishRapidPosition()
@@ -113,6 +123,24 @@ void NMEA2000ClientROS2::publishAttitude()
     
     if (attitude_pub_)
         attitude_pub_->publish(msg);
+
+    sensor_msgs::msg::Imu imu;
+    imu.header = msg.header;
+    const double cr = std::cos(Roll * 0.5);
+    const double sr = std::sin(Roll * 0.5);
+    const double cp = std::cos(Pitch * 0.5);
+    const double sp = std::sin(Pitch * 0.5);
+    const double cy = std::cos(Yaw * 0.5);
+    const double sy = std::sin(Yaw * 0.5);
+    imu.orientation.w = cr * cp * cy + sr * sp * sy;
+    imu.orientation.x = sr * cp * cy - cr * sp * sy;
+    imu.orientation.y = cr * sp * cy + sr * cp * sy;
+    imu.orientation.z = cr * cp * sy - sr * sp * cy;
+    imu.orientation_covariance[0] = -1.0;
+    imu.angular_velocity_covariance[0] = -1.0;
+    imu.linear_acceleration_covariance[0] = -1.0;
+    if (imu_pub_)
+        imu_pub_->publish(imu);
 }
 
 void NMEA2000ClientROS2::publishPseudoNoise()

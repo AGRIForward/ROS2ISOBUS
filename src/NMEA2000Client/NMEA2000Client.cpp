@@ -170,23 +170,23 @@ void NMEA2000Client::Parse_GNSS_Position(struct FastPacketData *data)
     PositionDate = static_cast<int>(data->data[1] | (data->data[2] << 8));
     PositionTime = static_cast<double>(data->data[3] | (data->data[4] << 8) | (data->data[5] << 16) | (data->data[6] << 24)) * 1e-4;
 
-    unsigned long long lat = 0;
+    std::uint64_t lat_bits = 0;
     for (int i = 0; i < 8; i++)
-        lat += (static_cast<unsigned long long>(data->data[7 + i])) << (8 * i);
+        lat_bits |= (static_cast<std::uint64_t>(data->data[7 + i])) << (8 * i);
 
-    latitude = static_cast<double>(lat) * 1e-16;
+    latitude = static_cast<double>(static_cast<std::int64_t>(lat_bits)) * 1e-16;
 
-    unsigned long long lon = 0;
+    std::uint64_t lon_bits = 0;
     for (int i = 0; i < 8; i++)
-        lon += (static_cast<unsigned long long>(data->data[15 + i])) << (8 * i);
+        lon_bits |= (static_cast<std::uint64_t>(data->data[15 + i])) << (8 * i);
 
-    longitude = static_cast<double>(lon) * 1e-16;
+    longitude = static_cast<double>(static_cast<std::int64_t>(lon_bits)) * 1e-16;
 
-    unsigned long long alt = 0;
+    std::uint64_t alt_bits = 0;
     for (int i = 0; i < 8; i++)
-        alt += (static_cast<unsigned long long>(data->data[23 + i])) << (8 * i);
+        alt_bits |= (static_cast<std::uint64_t>(data->data[23 + i])) << (8 * i);
 
-    altitude = static_cast<double>(alt) * 1e-6;
+    altitude = static_cast<double>(static_cast<std::int64_t>(alt_bits)) * 1e-6;
 
     GPSType = data->data[31] & 0xF;
     GPSFix = data->data[31] >> 4;
@@ -244,16 +244,16 @@ void NMEA2000Client::Parse_GNSS_PseudoNoiseStats(struct FastPacketData *data)
 // Parse PGN 129025 Position, Rapid Update (NMEA 2000 Appendix B1).
 void NMEA2000Client::Parse_PositionRapidUpdate(const ByteArray8& data)
 {
-    unsigned long long lat = 0;
+    std::uint32_t lat_bits = 0;
     for (int i = 0; i < 4; i++)
-        lat += (static_cast<unsigned long long>(data[0 + i])) << (8 * i);
+        lat_bits |= (static_cast<std::uint32_t>(data[0 + i])) << (8 * i);
 
-    unsigned long long lon = 0;
+    std::uint32_t lon_bits = 0;
     for (int i = 0; i < 4; i++)
-        lon += (static_cast<unsigned long long>(data[4 + i])) << (8 * i);
+        lon_bits |= (static_cast<std::uint32_t>(data[4 + i])) << (8 * i);
 
-    rapid_latitude = (static_cast<double>(lat)) * 1e-7;
-    rapid_longitude = (static_cast<double>(lon)) * 1e-7;
+    rapid_latitude = static_cast<double>(static_cast<std::int32_t>(lat_bits)) * 1e-7;
+    rapid_longitude = static_cast<double>(static_cast<std::int32_t>(lon_bits)) * 1e-7;
 }
 
 // Parse PGN 129026 COG & SOG, Rapid Update (NMEA 2000 Appendix B1).
@@ -266,7 +266,7 @@ void NMEA2000Client::Parse_COG_SOG_RapidUpdate(const ByteArray8& data)
 // Parse PGN 127257 Attitude (NMEA 2000 Appendix B1).
 void NMEA2000Client::Parse_Attitude(const ByteArray8& data)
 {
-    Yaw = static_cast<int16_t>((data[1] << 0) | (data[2] << 8)) * 0.0001;
+    Yaw = static_cast<uint16_t>((data[1] << 0) | (data[2] << 8)) * 0.0001;
     Pitch = static_cast<int16_t>((data[3] << 0) | (data[4] << 8)) * 0.0001;
     Roll = static_cast<int16_t>((data[5] << 0) | (data[6] << 8)) * 0.0001;
 }

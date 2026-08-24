@@ -162,7 +162,9 @@ void TECUClass3Client::parseGuidanceStatus(const msg::IsobusFrame & imsg)
 {
     const double temp = ((imsg.data[0] << 0) | (imsg.data[1] << 8)) * 0.25 - 8032;
 
-    guidance_status_data_.measured_curvature = -temp;
+    // ISO 11783 uses km^-1 and positive-right curvature. The ROS interface
+    // uses REP-103 positive-left curvature in m^-1.
+    guidance_status_data_.measured_curvature = -temp / 1000.0;
     publishGuidanceStatus();
 }
 
@@ -206,10 +208,10 @@ void TECUClass3Client::setCurvature(double curvature)
 {
     setcurvature = curvature;
 
-    if(setcurvature > 8032)
-        setcurvature = 8032;
-    else if(setcurvature < -8031)
-        setcurvature = -8031;
+    if(setcurvature > 8.032)
+        setcurvature = 8.032;
+    else if(setcurvature < -8.03175)
+        setcurvature = -8.03175;
 
     pendingCurvatureCommand = usePeriodic();
     curvature_timeout_ = periodic_timeout_ticks_;
@@ -338,7 +340,8 @@ msg::IsobusFrame TECUClass3Client::curvatureCommand()
 
     if(start_guidance == 2)
     {
-        unsigned long temp = static_cast<unsigned long>((-guidance_status_data_.measured_curvature + 8032) * 4);
+        unsigned long temp = static_cast<unsigned long>(
+            (-guidance_status_data_.measured_curvature * 1000.0 + 8032.0) * 4.0);
 
         imsg.data[0] = static_cast<std::uint8_t>(temp & 0xFF);
         imsg.data[1] = static_cast<std::uint8_t>((temp >> 8) & 0xFF);
@@ -348,7 +351,8 @@ msg::IsobusFrame TECUClass3Client::curvatureCommand()
     }
     else
     {
-        unsigned long temp = static_cast<unsigned long>((-setcurvature + 8032) * 4);
+        unsigned long temp = static_cast<unsigned long>(
+            (-setcurvature * 1000.0 + 8032.0) * 4.0);
 
         imsg.data[0] = static_cast<std::uint8_t>(temp & 0xFF);
         imsg.data[1] = static_cast<std::uint8_t>((temp >> 8) & 0xFF);

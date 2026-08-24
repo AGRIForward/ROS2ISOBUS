@@ -24,6 +24,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_isobus/topics.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "geometry_msgs/msg/vector3_stamped.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
@@ -60,6 +62,8 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr rapid_position_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cog_sog_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr attitude_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr velocity_pub_;
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr pseudo_noise_pub_;
     rclcpp::Subscription<msg::IsobusFrame>::SharedPtr bus_sub_;
 };

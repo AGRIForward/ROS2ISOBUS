@@ -9,6 +9,30 @@ Purpose
 - Implements ISO 11783-6 Virtual Terminal client-side session and object pool publishing workflow.
 - Converts PoolEdit XML into VT object pool binary and exchanges VT function messages over ISOBUS TP.
 
+Creating the VT object pool
+1. Create and edit the VT object pool with the external
+   [PoolEdit editor](https://github.com/moehman/PoolEditDist).
+2. Select **Export** in the PoolEdit user interface. The export produces the
+   `.xml` object-pool file consumed by `vt_client_node`.
+3. Set the node's `xml_file` parameter to the exported file. The path can be
+   absolute or relative to the installed `ros2_isobus` package share directory.
+4. Use the XML object `name` values as `<name_token>` values in ROS topic paths
+   and in the C++/Python VT Client interface wrappers.
+
+The XML is converted to the binary VT object pool at runtime. A modified copy
+of [PoolEditParser](https://github.com/moehman/PoolEditParser) is embedded under
+`src/VTClient/pooledit_parser`; the local changes integrate the parser with
+VTClient and extend its object handling, including AUX-N objects. The embedded
+parser retains its GNU GPL version 3-or-later license notices and is licensed
+differently from the LGPL-licensed ROS2ISOBUS code.
+
+Example parameter configuration:
+```yaml
+vt_client_node:
+  ros__parameters:
+    xml_file: "config/my_object_pool.xml"
+```
+
 Standards / PGNs (coverage)
 - VT-to-WorkingSet: `PGN 58880` (`0xE600`)
 - WorkingSet-to-VT: `PGN 59136` (`0xE700`)
@@ -68,6 +92,11 @@ Topics
   - `ISOBUS/vt/container/<name_token>/visible/value|result`
   - `ISOBUS/vt/active_mask/<mask_name>/value|result`
   - `ISOBUS/vt/softkey_mask/<mask_name>/value|result`
+  - `ISOBUS/vt/aux/status` (`ros2_isobus/msg/VTAuxStatus`)
+  - `ISOBUS/vt/aux/<name_token>/input/value` (`std_msgs/msg/Float64`, normalized AUX-N value)
+  - `ISOBUS/vt/aux/<name_token>/input/raw` (`ros2_isobus/msg/VTAuxInputRaw`)
+  - `ISOBUS/vt/aux/<name_token>/assignment/value` (`ros2_isobus/msg/VTAuxAssignment`)
+  - `ISOBUS/vt/aux/<name_token>/assignment/result` (`ros2_isobus/msg/CommandResult`)
   - `ISOBUS/vt/update_result` (`ros2_isobus/msg/VTUpdateResult`)
 
 Addressing behavior
@@ -96,10 +125,21 @@ Parameters
   - `vt_session_tick_ms` (int, default `100`)
   - `vt_wait_address_claim` (bool, default `false`)
   - `vt_ws_maintenance_period_ms` (int, default `1000`)
+  - `vt_status_timeout_ms` (int, default `3000`)
+- AUX-N:
+  - `vt_aux_n_support` (bool, default `false`): enable AUX-N function-object bindings, assignments and input-status routing.
   - `vt_aux_preferred_store_override` (bool, default `false`): persist incoming AUX assignment as preferred even if VT sends "do not store as preferred".
   - `vt_aux_preferred_assignment_file` (string, default empty): optional file for loading/saving AUX preferred assignments.
     - File format: one mapping per line:
       - `<aux_input_name_hex> <aux_input_object_id_hex> <aux_function_object_id_hex>`
+
+AUX-N behavior
+- AUX-N support must be enabled with `vt_aux_n_support:=true`.
+- Each PoolEdit XML `auxiliaryfunction` object creates topics under `ISOBUS/vt/aux/<name_token>`.
+- The VT assignment command is accepted only when the function object exists, the AUX input NAME resolves through the AddressManager address book and the input object/type is valid.
+- Input status is routed only when its source address, AUX input NAME and input object ID match the active assignment.
+- The normalized value is published as `Float64`; the original values and state bits remain available in `VTAuxInputRaw`.
+- Preferred assignments can be loaded from and saved to `vt_aux_preferred_assignment_file`.
 
 Notes
 - VT function IDs are fixed in code to ISO 11783-6 values (not runtime-parameterized).
@@ -144,6 +184,12 @@ Custom Message Structures
   - `uint32 pending_updates`
   - `uint32 in_progress_updates`
   - `string detail`
+- `ros2_isobus/msg/VTAuxAssignment`
+  - Identifies the AUX function token/type, assigned input NAME and object ID, and preferred-storage request.
+- `ros2_isobus/msg/VTAuxInputRaw`
+  - Contains the normalized and raw input values plus learn, lock and interaction state.
+- `ros2_isobus/msg/VTAuxStatus`
+  - Summarizes AUX-N enable/learn state and the most recently routed input.
 
 Runtime pool update notes
 - `ISOBUS/vt/update` accepts:
