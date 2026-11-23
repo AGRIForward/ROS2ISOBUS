@@ -2,6 +2,12 @@
 
 All notable public-facing changes to this project are documented in this file.
 
+## 2026-11-23
+- Public builds now disable the proprietary AuthLib provider by default; it remains available through an explicit CMake option.
+- TIM example configuration updated for research/simulation use, with speed, curvature, rear PTO, rear hitch and AUX valves 1–4 enabled.
+- Diagnostics certification reporting is disabled by default and validates explicitly enabled ISO 11783-7 certification data.
+- Updated VT/PoolEdit documentation and licence metadata, and added SUT description conversion and TIM certificate compatibility tooling.
+
 ## 2026-08-24
 - New node: `NMEA2000Server`, providing event-driven ROS measurement to NMEA 2000 PGN encoding with fast-packet support for multi-frame PGNs.
 - Added standard ROS NMEA 2000 measurement interfaces for velocity and orientation (`TwistWithCovarianceStamped` and `sensor_msgs/Imu`).

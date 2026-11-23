@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <stdexcept>
 
 namespace ros2_isobus
 {
@@ -39,7 +40,7 @@ static constexpr std::uint32_t PGN_DM2 = 0xFECB;
 static constexpr std::uint32_t PGN_DM3 = 0xFECC;
 static constexpr std::uint32_t PGN_ISOBUS_COMPLIANCE_CERT = 0xFD42;
 static constexpr std::uint32_t PGN_CF_FUNCTIONALITIES = 0xFC8E;
-static constexpr std::uint32_t PGN_PRODUCT_IDENT = 0xFEEB;
+static constexpr std::uint32_t PGN_PRODUCT_IDENT = 0xFC8D;
 
 static constexpr std::uint8_t ACK_CONTROL_ACK = 0x00;
 static constexpr std::uint8_t ACK_CONTROL_NACK = 0x01;
@@ -47,6 +48,31 @@ static constexpr std::uint8_t ACK_CONTROL_NACK = 0x01;
 
 void Diagnostics::setConfig(const Config & cfg)
 {
+  if (cfg.compliance_certification_enabled) {
+    if (cfg.compliance_cert_year < 2000 || cfg.compliance_cert_year > 2061) {
+      throw std::invalid_argument("compliance_cert_year must be in range 2000..2061");
+    }
+    if (cfg.compliance_message_revision != 1) {
+      throw std::invalid_argument(
+        "compliance_message_revision must be 1 (ISO 11783-7 third-edition format)");
+    }
+    if (cfg.compliance_cert_revision < 0 || cfg.compliance_cert_revision > 30) {
+      throw std::invalid_argument(
+        "compliance_cert_revision is outside the range for the selected message revision");
+    }
+    if (cfg.compliance_lab_type < 0 || cfg.compliance_lab_type > 1) {
+      throw std::invalid_argument("compliance_lab_type must be 0 or 1 for certification information");
+    }
+    if (cfg.compliance_test_lab_id < 0 || cfg.compliance_test_lab_id > 0x07FF) {
+      throw std::invalid_argument("compliance_test_lab_id must fit the 11-bit field");
+    }
+    if (cfg.compliance_reference_number < 0 || cfg.compliance_reference_number > 64255) {
+      throw std::invalid_argument("compliance_reference_number must be in range 0..64255");
+    }
+    if (cfg.compliance_type_byte4 != 0 || cfg.compliance_type_byte5 != 0) {
+      throw std::invalid_argument("compliance reserved bytes 4 and 5 must be zero");
+    }
+  }
   cfg_ = cfg;
   cfg_.source_address = clampU8(cfg_.source_address);
   cfg_.priority = clampU8(cfg_.priority);
@@ -91,9 +117,9 @@ bool Diagnostics::sameDtcs(const std::vector<Dtc> & a, const std::vector<Dtc> & 
 std::vector<std::uint8_t> Diagnostics::buildAsciiStarPayload(const std::vector<std::string> & fields)
 {
   std::vector<std::uint8_t> payload;
-  for (std::size_t i = 0; i < fields.size(); ++i) {
-    payload.insert(payload.end(), fields[i].begin(), fields[i].end());
-    if (i + 1U < fields.size()) payload.push_back(static_cast<std::uint8_t>('*'));
+  for (const auto & field : fields) {
+    payload.insert(payload.end(), field.begin(), field.end());
+    payload.push_back(static_cast<std::uint8_t>('*'));
   }
   if (payload.size() < 8U) payload.resize(8U, 0xFF);
   return payload;
@@ -117,9 +143,9 @@ std::vector<std::uint8_t> Diagnostics::buildSwIdentPayload() const
   // byte 1 = number of fields, byte 2..n = '*' separated software identification string.
   std::vector<std::uint8_t> payload;
   payload.push_back(clampU8(static_cast<int>(cfg_.software_ident_fields.size())));
-  for (std::size_t i = 0; i < cfg_.software_ident_fields.size(); ++i) {
-    payload.insert(payload.end(), cfg_.software_ident_fields[i].begin(), cfg_.software_ident_fields[i].end());
-    if (i + 1U < cfg_.software_ident_fields.size()) payload.push_back(static_cast<std::uint8_t>('*'));
+  for (const auto & field : cfg_.software_ident_fields) {
+    payload.insert(payload.end(), field.begin(), field.end());
+    payload.push_back(static_cast<std::uint8_t>('*'));
   }
   if (payload.size() < 8U) payload.resize(8U, 0xFF);
   return payload;
@@ -147,12 +173,12 @@ std::vector<std::uint8_t> Diagnostics::buildIsobusCompliancePayload() const
   if (year_off > 63) year_off = 63;
   const std::uint8_t year6 = static_cast<std::uint8_t>(year_off) & 0x3FU;
 
-  const std::uint8_t rev5 = cfg_.compliance_cert_revision & 0x1FU;
+  const std::uint8_t rev5 = static_cast<std::uint8_t>(cfg_.compliance_cert_revision) & 0x1FU;
   const std::uint8_t rev_b1_2 = rev5 & 0x03U;
   const std::uint8_t rev_b3 = static_cast<std::uint8_t>((rev5 >> 2U) & 0x01U);
   const std::uint8_t rev_b4_5 = static_cast<std::uint8_t>((rev5 >> 3U) & 0x03U);
 
-  const std::uint8_t lab_type2 = cfg_.compliance_lab_type & 0x03U;
+  const std::uint8_t lab_type2 = static_cast<std::uint8_t>(cfg_.compliance_lab_type) & 0x03U;
   const std::uint16_t lab_id11 = static_cast<std::uint16_t>(cfg_.compliance_test_lab_id & 0x07FFU);
   const std::uint8_t lab_id_lsb3 = static_cast<std::uint8_t>(lab_id11 & 0x0007U);
   const std::uint8_t lab_id_msb8 = static_cast<std::uint8_t>((lab_id11 >> 3U) & 0x00FFU);
@@ -161,10 +187,10 @@ std::vector<std::uint8_t> Diagnostics::buildIsobusCompliancePayload() const
   const std::uint8_t b2 = static_cast<std::uint8_t>(
     (lab_id_lsb3 << 5U) | (rev_b4_5 << 3U) | (lab_type2 << 1U) | rev_b3);
   const std::uint8_t b3 = lab_id_msb8;
-  const std::uint8_t b4 = cfg_.compliance_type_byte4;
-  const std::uint8_t b5 = cfg_.compliance_type_byte5;
+  const std::uint8_t b4 = static_cast<std::uint8_t>(cfg_.compliance_type_byte4);
+  const std::uint8_t b5 = static_cast<std::uint8_t>(cfg_.compliance_type_byte5);
   const std::uint8_t b6 = static_cast<std::uint8_t>((cfg_.compliance_message_revision & 0x01U) << 7U);
-  const std::uint16_t ref = cfg_.compliance_reference_number;
+  const std::uint16_t ref = static_cast<std::uint16_t>(cfg_.compliance_reference_number);
 
   return std::vector<std::uint8_t>{
     b1,
@@ -190,10 +216,12 @@ std::vector<std::uint8_t> Diagnostics::buildFunctionalitiesPayload() const
   payload.push_back(0xFF);
   payload.push_back(clampU8(static_cast<int>(cfg_.functionalities.size())));
   for (const auto & e : cfg_.functionalities) {
+    auto option_count = e.options.size();
+    while (option_count > 0U && e.options[option_count - 1U] == 0U) --option_count;
     payload.push_back(e.id);
     payload.push_back(e.generation);
-    payload.push_back(clampU8(static_cast<int>(e.options.size())));
-    payload.insert(payload.end(), e.options.begin(), e.options.end());
+    payload.push_back(clampU8(static_cast<int>(option_count)));
+    payload.insert(payload.end(), e.options.begin(), e.options.begin() + option_count);
   }
   if (payload.size() < 8U) payload.resize(8U, 0xFF);
   return payload;
@@ -205,7 +233,7 @@ std::array<std::uint8_t, 4> Diagnostics::encodeDtc(const Dtc & d)
     static_cast<std::uint8_t>(d.spn & 0xFFU),
     static_cast<std::uint8_t>((d.spn >> 8U) & 0xFFU),
     static_cast<std::uint8_t>(((d.spn >> 16U) & 0x07U) << 5U | (d.fmi & 0x1FU)),
-    static_cast<std::uint8_t>((d.cm ? 0x80U : 0x00U) | (d.oc & 0x7FU))
+    static_cast<std::uint8_t>(d.oc & 0x7FU)
   };
 }
 
@@ -333,7 +361,11 @@ void Diagnostics::handleMsg(const msg::IsobusFrame & fr)
       }
       return;
     case PGN_ISOBUS_COMPLIANCE_CERT:
-      sendPayload(PGN_ISOBUS_COMPLIANCE_CERT, fr.sa, buildIsobusCompliancePayload());
+      if (cfg_.compliance_certification_enabled) {
+        sendPayload(PGN_ISOBUS_COMPLIANCE_CERT, fr.sa, buildIsobusCompliancePayload());
+      } else if (specific && cfg_.nack_unsupported_request) {
+        sendAck(fr.sa, ACK_CONTROL_NACK, PGN_ISOBUS_COMPLIANCE_CERT);
+      }
       return;
     case PGN_CF_FUNCTIONALITIES:
       sendPayload(PGN_CF_FUNCTIONALITIES, fr.sa, buildFunctionalitiesPayload());

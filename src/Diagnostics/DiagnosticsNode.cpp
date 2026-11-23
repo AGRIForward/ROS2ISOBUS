@@ -37,13 +37,6 @@ std::uint8_t DiagnosticsROS2::clamp_u8(int v)
   return static_cast<std::uint8_t>(v);
 }
 
-static std::uint16_t clamp_u16(int v)
-{
-  if (v < 0) return 0U;
-  if (v > 65535) return 65535U;
-  return static_cast<std::uint16_t>(v);
-}
-
 std::vector<std::uint8_t> DiagnosticsROS2::parse_byte_list(const std::string & s)
 {
   std::vector<std::uint8_t> out;
@@ -125,14 +118,16 @@ void DiagnosticsROS2::load_config()
     "software_ident_fields", std::vector<std::string>{"ROS2ISOBUS#Diagnostics#1.0"});
   cfg.diagnostic_protocol_id = clamp_u8(declare_parameter<int>("diagnostic_protocol_id", 0x00));
 
-  cfg.compliance_test_lab_id = clamp_u16(declare_parameter<int>("compliance_test_lab_id", 0x18));
-  cfg.compliance_cert_year = std::max<int>(0, declare_parameter<int>("compliance_cert_year", 2026));
-  cfg.compliance_cert_revision = clamp_u8(declare_parameter<int>("compliance_cert_revision", 1));
-  cfg.compliance_lab_type = clamp_u8(declare_parameter<int>("compliance_lab_type", 1));
-  cfg.compliance_reference_number = clamp_u16(declare_parameter<int>("compliance_reference_number", 0));
-  cfg.compliance_message_revision = clamp_u8(declare_parameter<int>("compliance_message_revision", 1));
-  cfg.compliance_type_byte4 = clamp_u8(declare_parameter<int>("compliance_type_byte4", 0));
-  cfg.compliance_type_byte5 = clamp_u8(declare_parameter<int>("compliance_type_byte5", 0));
+  cfg.compliance_certification_enabled =
+    declare_parameter<bool>("compliance_certification_enabled", false);
+  cfg.compliance_test_lab_id = declare_parameter<int>("compliance_test_lab_id", -1);
+  cfg.compliance_cert_year = declare_parameter<int>("compliance_cert_year", 0);
+  cfg.compliance_cert_revision = declare_parameter<int>("compliance_cert_revision", -1);
+  cfg.compliance_lab_type = declare_parameter<int>("compliance_lab_type", -1);
+  cfg.compliance_reference_number = declare_parameter<int>("compliance_reference_number", -1);
+  cfg.compliance_message_revision = declare_parameter<int>("compliance_message_revision", -1);
+  cfg.compliance_type_byte4 = declare_parameter<int>("compliance_type_byte4", 0);
+  cfg.compliance_type_byte5 = declare_parameter<int>("compliance_type_byte5", 0);
 
   cfg.product_ident_code = declare_parameter<std::string>("product_ident_code", "UNSET-CODE");
   cfg.product_ident_brand = declare_parameter<std::string>("product_ident_brand", "UNSET-BRAND");

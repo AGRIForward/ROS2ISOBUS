@@ -24,7 +24,10 @@ of [PoolEditParser](https://github.com/moehman/PoolEditParser) is embedded under
 `src/VTClient/pooledit_parser`; the local changes integrate the parser with
 VTClient and extend its object handling, including AUX-N objects. The embedded
 parser retains its GNU GPL version 3-or-later license notices and is licensed
-differently from the LGPL-licensed ROS2ISOBUS code.
+differently from the LGPL-licensed ROS2ISOBUS code. Because the parser sources
+are compiled and linked directly into `vt_client_node`, the distributed VT
+component is GPL-3.0-or-later. The GPL text is provided in
+`LICENSES/GPL-3.0-or-later.txt`.
 
 Example parameter configuration:
 ```yaml

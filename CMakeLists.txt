@@ -4,7 +4,7 @@ project(ros2_isobus)
 option(
   ROS2_ISOBUS_ENABLE_AUTHLIB
   "Build TIMClient with the proprietary AEF AuthLib provider"
-  ON)
+  OFF)
 
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -21,9 +21,6 @@ find_package(geometry_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(diagnostic_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 add_executable(address_manager_node
@@ -185,7 +182,17 @@ install(DIRECTORY config/
 
 if(ROS2_ISOBUS_ENABLE_AUTHLIB)
   install(DIRECTORY third_party/AuthLib/cert/
-    DESTINATION share/${PROJECT_NAME}/third_party/AuthLib/cert)
+    DESTINATION share/${PROJECT_NAME}/third_party/AuthLib/cert
+    FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    FILES_MATCHING
+      PATTERN "Server" EXCLUDE
+      PATTERN "*.der")
+  install(DIRECTORY third_party/AuthLib/cert/
+    DESTINATION share/${PROJECT_NAME}/third_party/AuthLib/cert
+    FILE_PERMISSIONS OWNER_READ OWNER_WRITE
+    FILES_MATCHING
+      PATTERN "Server" EXCLUDE
+      PATTERN "*.key.hex")
 endif()
 
 # rosidl_generate_interfaces() already installs Python package `${PROJECT_NAME}`.
@@ -273,6 +280,16 @@ if(BUILD_TESTING)
     ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
   ament_target_dependencies(test_tecu_class3_server rosidl_default_runtime)
   target_link_libraries(test_tecu_class3_server "${cpp_typesupport_target}")
+  ament_add_gtest(
+    test_diagnostics_iso11783_12
+    test/test_diagnostics_iso11783_12.cpp
+    src/Diagnostics/Diagnostics.cpp)
+  target_include_directories(test_diagnostics_iso11783_12 PRIVATE
+    include
+    src/Diagnostics
+    ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp)
+  ament_target_dependencies(test_diagnostics_iso11783_12 rosidl_default_runtime)
+  target_link_libraries(test_diagnostics_iso11783_12 "${cpp_typesupport_target}")
 endif()
 
 ament_package()

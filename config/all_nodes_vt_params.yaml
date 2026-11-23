@@ -40,14 +40,9 @@ diagnostics_node:
     software_ident_fields: ["ROS2ISOBUS#Diagnostics#1.0"]
     diagnostic_protocol_id: 0
 
-    compliance_test_lab_id: 507
-    compliance_cert_year: 2017
-    compliance_cert_revision: 1
-    compliance_lab_type: 1
-    compliance_reference_number: 4660
-    compliance_message_revision: 1
-    compliance_type_byte4: 0
-    compliance_type_byte5: 0
+    # Disabled in the public research/simulation configuration. Enable only
+    # with valid values from an actual conformance certification record.
+    compliance_certification_enabled: false
 
     cf_functionality_ids: [0]
     cf_functionality_generations: [1]

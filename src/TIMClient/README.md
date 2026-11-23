@@ -29,7 +29,10 @@ Standards / PGNs (coverage)
   - Function request/status handling for configured TIM functions (AUX/speed/curvature/rear PTO/rear hitch)
 
 Limitations
-- Authentication/lead-server verification requires an auth provider integration; use `auth_mode=None` only for testing.
+- The committed public configuration uses `auth_mode=None` for research and
+  simulation only; it does not authenticate the TIM peer.
+- Authentication/lead-server verification requires an authorized private build
+  with the proprietary AuthLib provider explicitly enabled.
 - Supports one active server target at a time.
 - Server SA auto-detect is based on TIM server broadcast status; multi-server arbitration beyond tracked NAME/SA updates is not implemented.
 
@@ -109,9 +112,20 @@ Build/Run
 ros2 run ros2_isobus tim_client_node
 ```
 
+The public build disables AuthLib by default. To enable it explicitly when the
+licensed vendor files are available:
+```bash
+colcon build --packages-select ros2_isobus --cmake-args \
+  -DROS2_ISOBUS_ENABLE_AUTHLIB=ON
+```
+
 Parameter file
 - TIM default launch parameters are stored in shared file `config/all_nodes_tim_params.yaml`.
-- Update `authlib.root_cert_path`, `authlib.client_*_cert_path`, and `authlib.client_private_key_hex` to match your certificate set.
+- The committed file selects `auth_mode=None` and disables authentication
+  payload logging. This is a research/simulation configuration only.
+- In an explicitly AuthLib-enabled private build, change `auth_mode` to
+  `AuthLib` and update `authlib.root_cert_path`, `authlib.client_*_cert_path`,
+  and `authlib.client_private_key_hex` locally.
 - Validate certificate/key interoperability before runtime with:
 ```bash
 ./scripts/tim_auth_compat_check.py --params-file config/all_nodes_tim_params.yaml

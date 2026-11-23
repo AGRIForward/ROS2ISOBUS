@@ -227,11 +227,20 @@ def load_params(params_file: Path, node_name: str) -> Dict[str, str]:
 
         raw = yaml.safe_load(params_file.read_text(encoding="utf-8", errors="replace"))
         if isinstance(raw, dict):
-            return _flatten_ros_params_dict(raw, node_name)
+            values = _flatten_ros_params_dict(raw, node_name)
+            # NAME and ISO 11783-12 compliance parameters live in their own ROS
+            # nodes in the shared stack YAML, but are part of the TIM certificate
+            # compatibility checks.
+            for related_node in ("address_manager_node", "diagnostics_node"):
+                values.update(_flatten_ros_params_dict(raw, related_node))
+            return values
     except Exception:
         pass
 
-    return parse_simple_yaml(params_file, node_name)
+    values = parse_simple_yaml(params_file, node_name)
+    for related_node in ("address_manager_node", "diagnostics_node"):
+        values.update(parse_simple_yaml(params_file, related_node))
+    return values
 
 
 def resolve_path(path_str: str, repo_root: Path) -> Optional[Path]:
@@ -409,6 +418,17 @@ def parse_certified_function_ids_from_pseudonym(pseudonym: str) -> List[int]:
     data = bytes.fromhex(raw)
     if len(data) < 2:
         return []
+
+    # AEF TIM series pseudonyms encode each certified TIM function after a
+    # 0x33 record marker. For example, ...3344... represents function 0x44.
+    record_ids = []
+    for index in range(len(data) - 1):
+        if data[index] == 0x33 and data[index + 1] in range(0x01, 0x80):
+            function_id = data[index + 1]
+            if function_id not in record_ids:
+                record_ids.append(function_id)
+    if record_ids:
+        return record_ids
 
     count = data[0]
     body = data[1:]
@@ -661,9 +681,14 @@ def run_checks(rep: Reporter, values: Dict[str, str], repo_root: Path, strict_cr
             if pseudonym:
                 certified_fn_ids = parse_certified_function_ids_from_pseudonym(pseudonym)
                 rep.add(True, "certified TIM function IDs (heuristic from pseudonym)", f"pseudonym={pseudonym}; parsed=" + (", ".join(f"0x{x:02X}" for x in certified_fn_ids) if certified_fn_ids else "<none>"))
-                if certified_fn_ids and requested_fn_ids:
-                    missing = [x for x in requested_fn_ids if x not in certified_fn_ids]
-                    rep.add(len(missing) == 0, "requested functions covered by certificate", "all requested functions found" if not missing else "missing: " + ", ".join(f"0x{x:02X}" for x in missing))
+                # The series-certificate pseudonym exposes the fixed TIM
+                # functions as 0x33 records. AUX channel IDs (0x01..0x20) are
+                # described by the SUT functionality options and must not be
+                # treated as missing merely because they are absent here.
+                cert_checkable_fn_ids = [x for x in requested_fn_ids if x > 0x20]
+                if certified_fn_ids and cert_checkable_fn_ids:
+                    missing = [x for x in cert_checkable_fn_ids if x not in certified_fn_ids]
+                    rep.add(len(missing) == 0, "requested fixed functions covered by certificate", "all requested fixed functions found" if not missing else "missing: " + ", ".join(f"0x{x:02X}" for x in missing))
             else:
                 rep.add(False, "series certificate pseudonym", "not found; cannot infer certified function IDs")
         else:

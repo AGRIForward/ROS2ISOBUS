@@ -12,7 +12,9 @@ ISOBUS components have been used e.g. in the robot described in https://doi.org/
 
 - Authors: Juha Backman et al. (Luonnonvarakeskus / Natural Resources Institute Finland)  
 - Contact: juha.backman@luke.fi  
-- License: LGPL-3.0 (see LICENSE), except for separately licensed third-party components described below.
+- Licences: most ROS2ISOBUS sources are LGPL-3.0-only (see `LICENSE`);
+  the embedded PoolEditParser and the linked `vt_client_node` component are
+  GPL-3.0-or-later as described below.
 - Change history: [CHANGELOG.md](CHANGELOG.md)
 
 Third-party licensing
@@ -20,7 +22,9 @@ Third-party licensing
 - The modified PoolEditParser sources embedded in `src/VTClient/pooledit_parser`
   originate from [PoolEditParser](https://github.com/moehman/PoolEditParser) and
   retain their GNU GPL version 3-or-later license notices. They are not covered
-  by the repository's LGPL-3.0-only declaration.
+  by the repository's LGPL-3.0-only declaration. Because these sources are
+  compiled and linked directly into `vt_client_node`, the distributed VT
+  executable is GPL-3.0-or-later. See `LICENSES/GPL-3.0-or-later.txt`.
 - The optional AEF AuthLib and CryptoLib files are not included in version
   control. When supplied locally and enabled in the build, they remain subject
   to their own vendor licensing terms and are not covered by this repository's
@@ -48,28 +52,29 @@ Dependencies
 
 Building
 --------
-By default, TIMClient is built with proprietary AuthLib support. This preserves
-the normal private-repository build and requires the untracked AuthLib and
-CryptoLib files under `third_party/AuthLib` and `third_party/CryptoLib`:
+By default, TIMClient is built without proprietary AuthLib/CryptoLib support,
+so a clean public checkout needs no proprietary files:
 
 ```bash
 colcon build --packages-select ros2_isobus
 source install/setup.bash
 ```
 
-To build the complete package without AuthLib, disable the provider at CMake
-configuration time:
+To enable AuthLib explicitly in an authorized private environment, provide the
+vendor files under `third_party/AuthLib` and `third_party/CryptoLib` and build
+with:
 
 ```bash
 colcon build --packages-select ros2_isobus --cmake-args \
-  -DROS2_ISOBUS_ENABLE_AUTHLIB=OFF
+  -DROS2_ISOBUS_ENABLE_AUTHLIB=ON
 source install/setup.bash
 ```
 
-This still builds `tim_client_node` with `auth_mode=None` and `auth_mode=Dummy`
-support. Selecting `auth_mode=AuthLib` in an AuthLib-disabled build causes the
-node to stop with a clear configuration error. Reconfigure with
-`-DROS2_ISOBUS_ENABLE_AUTHLIB=ON` to restore AuthLib support.
+The default build still provides `tim_client_node` with `auth_mode=None` and
+`auth_mode=Dummy` for research/simulation. Selecting `auth_mode=AuthLib` in an
+AuthLib-disabled build causes the node to stop with a clear error. Enabling the
+CMake option while vendor files are unavailable causes a clear configuration
+error.
 
 Launching / Running
 -------------------
@@ -86,13 +91,16 @@ All nodes with TIM enabled (TECU Class2 + TIM):
 ```bash
 ros2 launch ros2_isobus all_nodes_tim.launch.py
 ```
+The committed TIM launch configuration uses unauthenticated `auth_mode=None`
+for research/simulation only. It must not be used for authenticated control.
 All nodes with VT client enabled:
 ```bash
 ros2 launch ros2_isobus all_nodes_vt.launch.py
 ```
 TIM launch uses one shared parameter file for all launched nodes:
 - `config/all_nodes_tim_params.yaml` (installed to `share/ros2_isobus/config/all_nodes_tim_params.yaml`)
-- In that file, update `tim_client_node.authlib.*` certificate/key paths for your own setup.
+- For an explicitly AuthLib-enabled private build, change `auth_mode` to
+  `AuthLib` and configure the `tim_client_node.authlib.*` paths locally.
 
 Run TIM client with the same parameter file manually:
 ```bash

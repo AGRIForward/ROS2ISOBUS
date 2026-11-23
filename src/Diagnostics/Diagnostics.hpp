@@ -48,6 +48,8 @@ public:
     std::uint32_t spn{0};
     std::uint8_t fmi{0};
     std::uint8_t oc{0};
+    // Retained for configuration compatibility. ISO 11783-12:2019 B.6/B.7
+    // requires the encoded SPN conversion method bit to be zero.
     std::uint8_t cm{0};
   };
 
@@ -81,20 +83,21 @@ public:
     std::vector<std::string> software_ident_fields{"ROS2ISOBUS#Diagnostics#1.0"};
     std::uint8_t diagnostic_protocol_id{0};
 
+    bool compliance_certification_enabled{false};
     // ISO 11783-7 A.29.4: 11-bit certification laboratory ID.
-    std::uint16_t compliance_test_lab_id{0x18};
-    int compliance_cert_year{2026};
+    int compliance_test_lab_id{-1};
+    int compliance_cert_year{0};
     // ISO 11783-7 A.29.2: 5-bit protocol revision.
-    std::uint8_t compliance_cert_revision{1};
+    int compliance_cert_revision{-1};
     // ISO 11783-7 A.29.3: 2-bit laboratory type (01 = AEF certified laboratory).
-    std::uint8_t compliance_lab_type{1};
+    int compliance_lab_type{-1};
     // ISO 11783-7 A.29.18: 16-bit certification reference number.
-    std::uint16_t compliance_reference_number{0};
+    int compliance_reference_number{-1};
     // ISO 11783-7 A.29.19: message revision bit (0=2nd ed format, 1=3rd+).
-    std::uint8_t compliance_message_revision{1};
+    int compliance_message_revision{-1};
     // Certification type bitfields (bytes 4..5 in B.27).
-    std::uint8_t compliance_type_byte4{0};
-    std::uint8_t compliance_type_byte5{0};
+    int compliance_type_byte4{0};
+    int compliance_type_byte5{0};
 
     std::string product_ident_code{"UNSET-CODE"};
     std::string product_ident_brand{"UNSET-BRAND"};

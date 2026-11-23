@@ -1,4 +1,28 @@
-# TIM Auth Compatibility Checker
+# ROS2ISOBUS Helper Scripts
+
+## SUT Description To YAML
+
+`sut_description_to_yaml.py` transfers a selected device from an AEF SUT
+Description XML to a ROS2ISOBUS parameter YAML. It updates:
+
+- AddressManager ISOBUS NAME (including the required byte-order conversion)
+- ISO 11783-12 ECU, software, compliance, functionality and product fields
+- TIM client protocol and authentication version fields when `TIM_Client_Data` is present
+
+The script validates that the XML `NAME` matches the individual
+`ISO11783-5_Data` fields before writing anything. For a SUT containing multiple
+devices, select one with `--device-name` or `--device-index`.
+
+```bash
+./scripts/sut_description_to_yaml.py \
+  /path/to/SUTDescription.xml \
+  --params-file config/all_nodes_tim_params.yaml
+```
+
+Use `--dry-run` to print the generated YAML without modifying a file, or
+`--output another.yaml` to preserve the input YAML.
+
+## TIM Auth Compatibility Checker
 
 `tim_auth_compat_check.py` validates TIMClient AuthLib certificate/key configuration against common interoperability and guideline expectations.
 
